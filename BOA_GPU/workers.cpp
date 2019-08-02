@@ -96,13 +96,25 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 				 bool &processing_required, TaskType &current_task, TaskType &prev_task, vector<Task<vector<string>>> &result,
 				 int num_task_types, size_t &res_write_idx){
 	
+
+	cout << "[EXEC_THREAD]: exec thread activated\n";
+
 	unique_lock<mutex> lock(q_full_mutex);
 	auto start = NOW;
 	while(processing_required){
 
+		cout << "[EXEC_THREAD]: waiting...\n";
+		
 		q_full_var.wait(lock);
+		is_notified = true;
+
+		if(!processing_required) continue;
+
+		cout << "[EXEC_THREAD]: staring...\n";
 
 		if(!flush_mode){
+
+			cout << "[EXEC_THREAD]: normal mode exec...\n";
 
 			if(current_task == TaskType::POA_CPU){
 				//call CPU thread worker(s)
@@ -138,7 +150,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			
 		}else{
 
-			cout << "Flushing remaining tasks\n";
+			cout << "[EXEC_THREAD]: flushing mode...\n";
 
 			if(prev_task != TaskType::UNDEF){
 				gpu_POA_free(task_refs[prev_task], prev_task);

@@ -3,6 +3,6 @@
 
 //class poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>;
 
-extern poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> CM;
+extern poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> *CM;
 
 #endif //GLOBAL_TASKS_MANAGER_H

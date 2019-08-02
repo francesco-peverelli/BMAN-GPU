@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
 	char* path_ref;	
 	
 	if(argc < 4){
-		cout << "Invalid arguments. Call this program as: ./poa maxSeqSize maxWindowSize sampleSize [read_file.pow]" << endl;
+		cout << "Invalid arguments. Call this program as: ./testGPU maxSeqSize maxWindowSize sampleSize [read_file.pow]" << endl;
 		return 0;
 	}
 
@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
 	
 	auto CPU_start = NOW;
 
-	result_BMEAN[0] = test_global_consensus(5, input);  
+	//result_BMEAN[0] = test_global_consensus(5, input);  
 
 	cout << "CPU done" << endl;
 #endif
@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
 
 
 	cout << "*** TASK PRODUCTION COMPLETED ***\n";
-	result_GPU[0] = test_global_consensus_gpu(5, input);
+	//result_GPU[0] = test_global_consensus_gpu(5, input);
 	auto GPU_end = NOW;
 	
 #if TEST

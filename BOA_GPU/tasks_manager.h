@@ -25,31 +25,31 @@ class SyncMultitaskQueues{
 		bool &flush_mode;
 		TaskType &curr_task;
 		int n_task_types;
-		size_t max_capacity;
 		size_t combined_size;
 
 	public:
-		SyncMultitaskQueues(std::condition_variable &qf, TaskType& ct, int n_t_types, size_t capacity, bool &exec_ntfy, bool &f_mode) : 
+		SyncMultitaskQueues(std::condition_variable &qf, TaskType& ct, int n_t_types, bool &exec_ntfy, bool &f_mode) : 
 				    queue_full_var(qf), curr_task(ct), exec_notified(exec_ntfy), flush_mode(f_mode) {
 			n_task_types = n_t_types;
 			gpu_task_queues = vector<vector<Task<T>>>(n_t_types);
-			max_capacity = capacity;
 			combined_size = 0;
 		}		
 
-		bool enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types){
+		void enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types){
 				
 				lock_guard<mutex> lock(q_mutex);
+
 				int n = tasks.size();
 				bool notify = false;
 				
-				if(combined_size + n > max_capacity){
-					if(!exec_notified){
-						flush_mode = true;
-						queue_full_var.notify_one();
-					}
-					return false;
+				int Ti = 0;
+				for(auto t : tasks){
+					t.task_id = combined_size + Ti;
+					gpu_task_queues[(int)task_types[Ti]].push_back(t);
+					Ti++;	
 				}
+				combined_size += n;
+
 				if(!exec_notified){
 					for(auto Tty : task_types){
 						if(gpu_task_queues[(int)Tty].size() > task_batch_size[Tty]){
@@ -61,17 +61,22 @@ class SyncMultitaskQueues{
 					}
 				}
 
-				int Ti = 0;
-				for(auto t : tasks){
-					t.task_id = combined_size + Ti;
-					gpu_task_queues[(int)task_types[Ti]].push_back(t);
-					Ti++;	
-				}
-				combined_size += n;
 				if(notify){
-					queue_full_var.notify_one(); 	
+					while(!exec_notified)
+						queue_full_var.notify_one(); 	
 				}
-				return true;
+
+				return;
+		}
+
+		void wait_and_flush_queue(){
+
+			lock_guard<mutex> lock(q_mutex);
+
+			while(exec_notified){} //very rough way to do this...
+			flush_mode = true;
+			while(!exec_notified)
+				queue_full_var.notify_one();
 		}
 	
 		void retrieve_data_batch(vector<Task<T>> &tasks, TaskType &task_type){
@@ -81,7 +86,9 @@ class SyncMultitaskQueues{
 		}
 	
 		size_t get_combined_size(){ return combined_size; }
+		
 		int get_queue_size(TaskType &t){ return gpu_task_queues[t].size(); }
+		
 		void reset_combined_size(){
 			lock_guard<mutex> lock(q_mutex); 
 			combined_size = 0; 
@@ -92,7 +99,9 @@ template<typename T>
 class SyncMultitaskConcurrencyManager{
 
 private:
-	size_t preprocessing_tasks = 0;
+
+	//poa task queues
+	poa_gpu_utils::SyncMultitaskQueues<T> *poa_queues;
 
 public:
 
@@ -112,40 +121,34 @@ public:
 	poa_gpu_utils::TaskType previous_task = poa_gpu_utils::TaskType::UNDEF;
 	vector<TaskRefs> task_refs;
 
-	//poa task queues
-	poa_gpu_utils::SyncMultitaskQueues<T> *poa_queues;
 	std::size_t current_res_index = 0;
 	int res_size;
 	bool processing_required = true;
-	bool task_production_done = false;
 	bool exec_notified = false;
 	bool flush_mode = false;
 	
 	SyncMultitaskConcurrencyManager(int n_task_types, int batch_size) : res_size(batch_size) {
 		task_refs = vector<TaskRefs>(n_task_types);
 		poa_queues = new poa_gpu_utils::SyncMultitaskQueues<T>(
-					queue_rdy_var, current_task, n_task_types, batch_size, exec_notified, flush_mode
+					queue_rdy_var, current_task, n_task_types, exec_notified, flush_mode
      	             	    	 );
 	}
 	
 	~SyncMultitaskConcurrencyManager(){ delete poa_queues; }	
 
-	void register_preprocessing_task(){
-		lock_guard<mutex> lock(task_reg_mutex);
-		preprocessing_tasks++;
-	}
-	
-	bool enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types){
-		bool res = poa_queues->enqueue_task_vector(tasks, task_types);
-		if(res){
-			lock_guard<mutex> lock(task_reg_mutex);
-			preprocessing_tasks--;
+	void enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types){
+		size_t new_size = poa_queues->get_combined_size() + tasks.size();
+		if(new_size > results.size()){
+			results.resize(new_size, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>()));
 		}
+		poa_queues->enqueue_task_vector(tasks, task_types);
 	}
-	
-	void initialize_results(){};	
 
-	void wait_and_flush_all(){
+	void wait_and_flush_queue(){
+		poa_queues->wait_and_flush_queue();
+	}
+
+	/*void wait_and_flush_all(){
 		condition_variable all_enqueued;
 		unique_lock<mutex> lck(output_rdy_mutex);
 		while(preprocessing_tasks != 0){
@@ -155,7 +158,7 @@ public:
 		queue_rdy_var.notify_one();
 		output_rdy_var.wait(lck);
 		processing_required = false;
-	}
+	}*/
 };
 
 template<>

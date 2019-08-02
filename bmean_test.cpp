@@ -95,12 +95,13 @@ vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int ba
 vector<string> test_bmean(vector<string> &W, int maxMSA, string path) {
 
 	//sw POA lib call
-	vector<string> result_POA = consensus_POA( W, maxMSA, path );
+	//vector<string> result_POA = consensus_POA( W, maxMSA, path );
 
-	return result_POA;
-
+	//return result_POA;
+	cout << "ERROR:: This is not a function!!!!!\n";
+	return vector<string>();
 }
-
+/*
 vector<string> test_global_consensus(int n_windows, vector<vector<string>> &W){
 
 	vector<vector<string>> read_consensus(n_windows);
@@ -121,38 +122,64 @@ vector<string> test_global_consensus(int n_windows, vector<vector<string>> &W){
 
 vector<string> test_global_consensus_gpu(int n_windows, vector<vector<string>> &W){
 	
-	ctpl::thread_pool my_pool(32);
+	cout << "[TEST_GPU]: preparing thread pool...\n";
+
+	ctpl::thread_pool my_pool(1001);
 	
 	int nty = NUM_TASK_TYPES;
 	
+	cout << "[TEST_GPU]: launching executor worker...\n";
+
 	poa_gpu_utils::SyncMultitaskQueues<vector<string>> &q_ref = *(CM.poa_queues);
 	my_pool.push(poa_executor_worker, ref(q_ref), CM.task_refs, ref(CM.queue_rdy_mutex), 
 		     ref(CM.output_rdy_mutex), ref(CM.queue_rdy_var), ref(CM.output_rdy_var), 
 		     CM.exec_notified, CM.flush_mode, CM.processing_required, 
 		     CM.current_task, CM.previous_task, 
 		     CM.results, nty, CM.current_res_index);
-	
-	vector<vector<string>> read_consensus(n_windows);
+
+	cout << "[TEST_GPU]: launching input preprocessing workers...\n";
+
 	int i = 0;
 	int j = 0;
 	int size = W.size();
 	vector<string> results(size/n_windows);
+	vector<vector<vector<string>>> read_consensus(size/n_windows);
+
+	cout << "[TEST_GPU]: aggregating input of " << size << " into " << n_windows << " reads segments...\n";
+	
+	int scheduled_threads = 1;
 	while(i < size){
-		for(vector<string> &el : read_consensus){
-			el = W[i]; 
-			i++;
+		if(scheduled_threads < 1000){
+			scheduled_threads++;
+			cout << "[TEST_GPU]: " << my_pool.n_idle() << " idle threads, scheduled=" << scheduled_threads << "sheduling next job...\n";
+			vector<vector<string>> &window_ensamble = read_consensus[j];
+			window_ensamble = vector<vector<string>>(n_windows);
+			cout << "[TEST_GPU]: start i=" << i << "/" << size << "\n";
+			for(vector<string> &el : window_ensamble){
+				el = W[i]; 
+				i++;
+			}
+			cout << "[TEST_GPU]: end i=" << i << "/" << size << "\n";
+			vector<vector<string>> V;
+
+			cout << "[TEST_GPU]: pushing in_size=" << window_ensamble.size() << "\n";
+
+			my_pool.push(gpu_global_consensus_worker, V, window_ensamble, MAX_MSA, SC_PATH);
+			CM.register_preprocessing_task();
+			results[j] = V[0][0];
+			j++;
+		}else{
+			my_pool.resize(0);
+			scheduled_threads = 0;
+			my_pool.resize(1000);
+			cout << "[TEST_GPU]: detatched all running threads (i=" << i << ")...\n";
 		}
-		vector<vector<string>> V;
-		my_pool.push(gpu_global_consensus_worker, V, read_consensus, MAX_MSA, SC_PATH);
-		CM.register_preprocessing_task();
-		results[j] = V[0][0];
-		j++;
 	}	
 	CM.wait_and_flush_all();	
 
 	return results;
 }
-
+*/
 vector<string> generate_random_window(int max_L, int min_L, int min_N, int max_N) {
 
 	random_device rd;
@@ -378,9 +405,17 @@ void test_batch(vector<vector<string>> obtained, vector<vector<string>> expected
 
 vector<vector<string>> get_random_sample(int batch_size, int max_L = MAX_L, int min_L = MIN_L, int max_N = MAX_N, int min_N = MIN_N) { 
 	
-	vector<vector<string>> sample;
+	cout << "Alive!\n";
+	vector<vector<string>> sample;	
+	int step = batch_size / 10;
+	int perc = 0;
+
+	cout << "Sample generation: size=" << batch_size << ", L=[" << min_L << "," << max_L << "], N=[" << min_N << "," << max_N << "]\n";
+
+
 	for(int i = 0; i < batch_size; i++) {
 		sample.push_back(generate_random_window(max_L, min_L, min_N, max_N));
+		if(i % step == 0){ cout << "Generation: [" << perc << "%]\n"; perc += 10;  }
 	}
 	return sample;
 }
