@@ -28,6 +28,8 @@ extern "C"{
 #include "seq_util.h"
 }
 
+#define GPU_TEST 1
+
 //TODO REMOVE HASHTABLES
 
 using namespace std;
@@ -1030,6 +1032,8 @@ vector<vector<string>> global_consensus_dequeue(vector<poa_gpu_utils::Task<vecto
 pair<vector<poa_gpu_utils::Task<vector<string>>>, unordered_map<kmer, unsigned>> 
 MSABMAAC_gpu_enqueue(const vector<string>& Reads,uint32_t k, double edge_solidity, unsigned solidThresh, unsigned minAnchors, unsigned maxMSA, string path){
 
+#if (GPU_TEST == false)
+
 	int kmer_size(k);
 	kmer2localisation kmer_index;
 	std::unordered_map<kmer, unsigned> merCounts;
@@ -1053,6 +1057,13 @@ MSABMAAC_gpu_enqueue(const vector<string>& Reads,uint32_t k, double edge_solidit
 		//std::vector<std::vector<std::string>> fRes;
 		//return std::make_pair(fRes, merCounts);
 	}
+#endif
+#if GPU_TEST
+	vector<vector<string>> result;
+	std::unordered_map<kmer, unsigned> merCounts;
+	for(int i = 0; i < 5; i++)
+		result.push_back(Reads);
+#endif	
 
 	//consensus preprocessing & eventual enqueue ... 
 	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(result,Reads.size(), maxMSA, path);
