@@ -1118,7 +1118,7 @@ std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsign
 	//~ cerr<<GC[0][0]<<endl;
 	//~ exit(0);
 
-
+#if (GPU_TEST == false)
 
 	kmer2localisation kmer_index;
 	std::unordered_map<kmer, unsigned> merCounts;
@@ -1163,6 +1163,15 @@ std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsign
 		// fRes.push_back(res);
 		return std::make_pair(fRes, merCounts);
 	}
+#endif
+#if GPU_TEST
+	vector<vector<string>> result;
+	std::unordered_map<kmer, unsigned> merCounts;
+	for(int i = 0; i < 5; i++)
+		result.push_back(Reads);
+#endif	
+
+
 	// std::cerr << "ok" << std::endl;
 	//~ cerr<<"PHASE 5 done"<<endl;
 
