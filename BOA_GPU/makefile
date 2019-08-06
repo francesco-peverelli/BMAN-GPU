@@ -9,9 +9,9 @@ INCLUDE_CUDA = -I /usr/local/cuda-10.1/include/
 
 gpu: cuda-poa.cu
 
-	$(COMPILER_GPU) --default-stream per-thread -lineinfo -dc cuda-poa.cu -o cuda-poa.o
-	$(COMPILER_GPU) -lcudadevrt --default-stream per-thread -lineinfo -x cu -c workers.cpp -o workers.o 
-	$(COMPILER_GPU) --default-stream per-thread -lineinfo -dlink cuda-poa.o workers.o -o poa.o -lcudadevrt
+	$(COMPILER_GPU) -g -G --default-stream per-thread -lineinfo -dc cuda-poa.cu -o cuda-poa.o
+	$(COMPILER_GPU) -g -G -lcudadevrt --default-stream per-thread -lineinfo -x cu -c workers.cpp -o workers.o 
+	$(COMPILER_GPU) -g -G --default-stream per-thread -lineinfo -dlink cuda-poa.o workers.o -o poa.o -lcudadevrt
 	#$(COMPILER_GPU) $(CFLAGS) --default-stream per-thread -I. -I $(BMEAN_DIR) -I $(BOA_DIR) -lineinfo -x cu -c lpo_fusion.cpp -o test.o  	
 	#$(COMPILER_GPU) $(CFLAGS) --default-stream per-thread -lineinfo link.o $(BOA_LIB) $(BMEAN_LIB) bmean_link.o cuda-poa.o test.o -o poa -lcudart
 

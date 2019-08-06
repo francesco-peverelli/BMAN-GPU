@@ -10,6 +10,10 @@ constexpr int MIN_L = 2;
 constexpr int MIN_N = 1;
 constexpr int MAX_N = 31;
 constexpr int MAX_MSA = 150;
+constexpr uint32_t K = 9;
+constexpr double EDGE_SOLIDITY = 0.0;
+constexpr unsigned SOLID_THRESH = 4; 
+constexpr unsigned MIN_ANCHORS = 2;
 const string SC_PATH = "./BOA/blosum80.mat"; 
 const string ERR_FILE_PATH = "./error_file_archive.txt";
 const string W_START = "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<";
@@ -101,85 +105,151 @@ vector<string> test_bmean(vector<string> &W, int maxMSA, string path) {
 	cout << "ERROR:: This is not a function!!!!!\n";
 	return vector<string>();
 }
-/*
-vector<string> test_global_consensus(int n_windows, vector<vector<string>> &W){
 
-	vector<vector<string>> read_consensus(n_windows);
-	int i = 0;
-	int j = 0;
-	int size = W.size();
-	vector<string> results(size/n_windows);
-	while(i < size){
-		for(vector<string> &el : read_consensus){
-			el = W[i]; 
-			i++;
-		}
-		results[j] = global_consensus(read_consensus, read_consensus.size(), MAX_MSA, SC_PATH)[0][0];
-		j++;
-	}	
-	return results;
+vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC(vector<vector<string>> &test_in){
+
+	vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> res;
+	res.reserve(BATCH_SIZE);
+
+	for(vector<string> &W : test_in){
+		res.push_back(MSABMAAC(W, K, EDGE_SOLIDITY, SOLID_THRESH, MIN_ANCHORS, MAX_MSA, SC_PATH));
+	}
+	return res;
 }
 
-vector<string> test_global_consensus_gpu(int n_windows, vector<vector<string>> &W){
+vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_gpu(vector<vector<string>> &test_in){
+
+	int pool_size = 2;
+	int jobs_to_load = test_in.size();
+	ctpl::thread_pool my_pool(pool_size);
+	vector< std::future< pair< vector< poa_gpu_utils::Task<vector<string> > >, unordered_map<kmer, unsigned> > > > enq_res(jobs_to_load);
+	vector<vector<poa_gpu_utils::Task<vector<string>>>> sched_tasks(jobs_to_load);
+	vector< std::future< vector<vector<string>> > > deq_res(jobs_to_load);
+	vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> result(jobs_to_load);
+
+	//cout << "[GPU-TEST]: init gpu test\n";
+
+	MSABMAAC_gpu_init_ctpl(BATCH_SIZE, my_pool);
+	pool_size--; //account for the executor thread
+
+	//cout << "[GPU-TEST]: init gpu done\n";
+
+	//load the first jobs
+	int next_job = 0;
+	while(next_job < pool_size && next_job < jobs_to_load){
+		//cout << "[GPU-TEST]: loading job " << next_job << "\n";
+		enq_res[next_job] = my_pool.push(MSABMAAC_gpu_enqueue_ctpl,
+					test_in[next_job], K, EDGE_SOLIDITY, SOLID_THRESH, MIN_ANCHORS, MAX_MSA, SC_PATH);
+		next_job++;
+	}
+	pair< vector< poa_gpu_utils::Task<vector<string> > >, unordered_map<kmer, unsigned>> f_res;
+	int curr_job = 0;
+
+	cout << "[GPU-TEST]: progressive enqueue...\n";
+
+	while(next_job < jobs_to_load){
 	
-	cout << "[TEST_GPU]: preparing thread pool...\n";
+		//cout << "[GPU-TEST]: getting job " << curr_job << "\n";
+		
+		enq_res[curr_job].wait();
 
-	ctpl::thread_pool my_pool(1001);
-	
-	int nty = NUM_TASK_TYPES;
-	
-	cout << "[TEST_GPU]: launching executor worker...\n";
+		//cout << "[GPU-TEST]: job " << curr_job << " is ready\n";
 
-	poa_gpu_utils::SyncMultitaskQueues<vector<string>> &q_ref = *(CM.poa_queues);
-	my_pool.push(poa_executor_worker, ref(q_ref), CM.task_refs, ref(CM.queue_rdy_mutex), 
-		     ref(CM.output_rdy_mutex), ref(CM.queue_rdy_var), ref(CM.output_rdy_var), 
-		     CM.exec_notified, CM.flush_mode, CM.processing_required, 
-		     CM.current_task, CM.previous_task, 
-		     CM.results, nty, CM.current_res_index);
-
-	cout << "[TEST_GPU]: launching input preprocessing workers...\n";
-
-	int i = 0;
-	int j = 0;
-	int size = W.size();
-	vector<string> results(size/n_windows);
-	vector<vector<vector<string>>> read_consensus(size/n_windows);
-
-	cout << "[TEST_GPU]: aggregating input of " << size << " into " << n_windows << " reads segments...\n";
-	
-	int scheduled_threads = 1;
-	while(i < size){
-		if(scheduled_threads < 1000){
-			scheduled_threads++;
-			cout << "[TEST_GPU]: " << my_pool.n_idle() << " idle threads, scheduled=" << scheduled_threads << "sheduling next job...\n";
-			vector<vector<string>> &window_ensamble = read_consensus[j];
-			window_ensamble = vector<vector<string>>(n_windows);
-			cout << "[TEST_GPU]: start i=" << i << "/" << size << "\n";
-			for(vector<string> &el : window_ensamble){
-				el = W[i]; 
-				i++;
-			}
-			cout << "[TEST_GPU]: end i=" << i << "/" << size << "\n";
-			vector<vector<string>> V;
-
-			cout << "[TEST_GPU]: pushing in_size=" << window_ensamble.size() << "\n";
-
-			my_pool.push(gpu_global_consensus_worker, V, window_ensamble, MAX_MSA, SC_PATH);
-			CM.register_preprocessing_task();
-			results[j] = V[0][0];
-			j++;
-		}else{
-			my_pool.resize(0);
-			scheduled_threads = 0;
-			my_pool.resize(1000);
-			cout << "[TEST_GPU]: detatched all running threads (i=" << i << ")...\n";
-		}
+		f_res = enq_res[curr_job].get();
+		//cout << "[GPU-TEST]: get done\n";
+		result[curr_job].second = f_res.second; 
+		//cout << "[GPU-TEST]: =1 done\n"; 
+		sched_tasks[curr_job] = f_res.first;
+		for(auto a : sched_tasks[curr_job])
+		cout << "T ID=" << a.task_id << "\n";
+		//cout << "[GPU-TEST]: =2 done\n"; 
+		curr_job++;
+		//cout << "[GPU-TEST]: loading job " << next_job << "\n";
+		enq_res[next_job] = my_pool.push(MSABMAAC_gpu_enqueue_ctpl,
+					test_in[next_job], K, EDGE_SOLIDITY, SOLID_THRESH, MIN_ANCHORS, MAX_MSA, SC_PATH);
+		next_job++;
+			
 	}	
-	CM.wait_and_flush_all();	
 
-	return results;
+	//cout << "[GPU-TEST]: enqueue trail...\n";
+
+	//wait until the remaining jobs are enqueued
+	while(curr_job < jobs_to_load){
+		f_res = enq_res[curr_job].get();
+		result[curr_job].second = f_res.second;
+		sched_tasks[curr_job] = f_res.first; 
+		for(auto a : sched_tasks[curr_job])
+		cout << "T ID=" << a.task_id << "\n";
+		curr_job++;
+	}
+
+	//cout << "[GPU-TEST]: starting flush...\n";
+
+	//execute all remaining POA tasks 
+	MSABMAAC_gpu_flush();
+
+	//cout << "[GPU-TEST]: dequeue start\n";
+
+	//load the first dequeue jobs
+	next_job = 0;
+	while(next_job < pool_size && next_job < jobs_to_load){
+		//cout << "[GPU-TEST]: loading job " << next_job << "\n";
+		deq_res[next_job] = my_pool.push(MSABMAAC_gpu_dequeue_ctpl, sched_tasks[next_job]);
+		next_job++;
+	}
+
+	//cout << "[GPU-TEST]: progressive dequeue...\n";
+
+	curr_job = 0;
+	while(next_job < jobs_to_load){
+		
+		result[curr_job].first = deq_res[curr_job].get();
+		curr_job++;
+		//cout << "[GPU-TEST]: loading job " << next_job << "\n";
+		deq_res[next_job] = my_pool.push(MSABMAAC_gpu_dequeue_ctpl, sched_tasks[next_job]);
+		next_job++;		
+	}
+
+	//cout << "[GPU-TEST]: dequeue trail...\n";
+
+	while(curr_job < jobs_to_load){
+		result[curr_job].first = deq_res[curr_job].get();
+		curr_job++;
+	}
+	MSABMAAC_gpu_done();
+	cout << "MSA test ALL DONE\n";
+
+	return result;
 }
-*/
+
+vector<vector<string>> convert_MSA_batch(vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> &in){
+	
+	vector<vector<string>> res(in.size());
+	int i = 0;
+	for(pair<vector<vector<string>>, unordered_map<kmer, unsigned>> &e : in){
+		if(e.first.size() == 0){
+			cout << "Empty res\n";
+			res[i] = vector<string>();
+			continue;
+		}
+
+		res[i] = (e.first)[0];
+		i++;
+	}
+	return res;
+}
+
+void test_MSA_batch(vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> &obtained, 
+		    vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> &expected){
+
+	auto c_obt = convert_MSA_batch(obtained);
+	auto c_exp = convert_MSA_batch(expected);
+
+	cout << "Conversion done\n";
+
+	test_batch(c_obt, c_exp);
+}
+
 vector<string> generate_random_window(int max_L, int min_L, int min_N, int max_N) {
 
 	random_device rd;
@@ -223,11 +293,12 @@ void get_bmean_batch_result(vector<vector<string>> windows, vector<vector<string
 void write_window(ofstream &file, vector<string> window_o, vector<string> window_e) {
 
 	file << W_START << endl;
-	
+	file << "<<obtained>>" << endl;
 	for(auto sequence : window_o){
 		file << sequence << endl;
 	}
 	file << endl;
+	file << "<<expected>>" << endl; 
 	for(auto sequence : window_e){
 		file << sequence << endl;
 	}
@@ -319,7 +390,7 @@ void test_task_batch(vector<poa_gpu_utils::Task<vector<string>>> &obtained, vect
 	
 	err_file.close();
 }
-void test_batch(vector<vector<string>> obtained, vector<vector<string>> expected) {
+void test_batch(vector<vector<string>> &obtained, vector<vector<string>> &expected) {
 	
 	ofstream err_file;
 	int b_size = obtained.size();

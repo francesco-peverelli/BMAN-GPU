@@ -5,7 +5,7 @@
 #include<condition_variable>
 #include<iostream>
 
-#define TIMEOUT 300
+#define TIMEOUT 10
 
 using namespace std;
 
@@ -43,7 +43,7 @@ class SyncMultitaskQueues{
 				bool notify = false;
 				
 				int Ti = 0;
-				for(auto t : tasks){
+				for(Task<T> &t : tasks){
 					t.task_id = combined_size + Ti;
 					gpu_task_queues[(int)task_types[Ti]].push_back(t);
 					Ti++;	
@@ -71,12 +71,23 @@ class SyncMultitaskQueues{
 
 		void wait_and_flush_queue(){
 
+			cout << "Flush called\n";
+			mutex my_mutex;
+			unique_lock<mutex> my_lock(my_mutex);
+			condition_variable my_var;
+
+			while(exec_notified){
+				cout << "Waiting for exec to terminate...\n";
+				my_var.wait_for(my_lock, chrono::duration<int>(TIMEOUT), [&]{ return exec_notified == 0; });
+			}
+
 			lock_guard<mutex> lock(q_mutex);
 
-			while(exec_notified){} //very rough way to do this...
 			flush_mode = true;
-			while(!exec_notified)
+			while(!exec_notified){
+				cout << "Exec notified\n";
 				queue_full_var.notify_one();
+			}
 		}
 	
 		void retrieve_data_batch(vector<Task<T>> &tasks, TaskType &task_type){
@@ -85,7 +96,10 @@ class SyncMultitaskQueues{
 			gpu_task_queues[task_type].clear();
 		}
 	
-		size_t get_combined_size(){ return combined_size; }
+		size_t get_combined_size(){ 
+			lock_guard<mutex> lock(q_mutex); 
+			return combined_size; 
+		}
 		
 		int get_queue_size(TaskType &t){ return gpu_task_queues[t].size(); }
 		
@@ -122,12 +136,12 @@ public:
 	vector<TaskRefs> task_refs;
 
 	std::size_t current_res_index = 0;
-	int res_size;
+	int num_task_types;
 	bool processing_required = true;
 	bool exec_notified = false;
 	bool flush_mode = false;
 	
-	SyncMultitaskConcurrencyManager(int n_task_types, int batch_size) : res_size(batch_size) {
+	SyncMultitaskConcurrencyManager(int n_task_types, int batch_size) : num_task_types(n_task_types) {
 		task_refs = vector<TaskRefs>(n_task_types);
 		poa_queues = new poa_gpu_utils::SyncMultitaskQueues<T>(
 					queue_rdy_var, current_task, n_task_types, exec_notified, flush_mode
@@ -146,6 +160,10 @@ public:
 
 	void wait_and_flush_queue(){
 		poa_queues->wait_and_flush_queue();
+	}
+
+	poa_gpu_utils::SyncMultitaskQueues<T>& get_queues_ref(){
+		return *poa_queues;
 	}
 
 	/*void wait_and_flush_all(){

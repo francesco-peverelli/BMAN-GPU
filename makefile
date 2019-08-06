@@ -2,7 +2,7 @@
 CXX= g++
 CXX_GPU= nvcc
 NVCC_W= -w
-CFLAGS = -O3 -std=c++11 -lpthread  -IBOA -IBOA_GPU
+CFLAGS = -G -g -O3 -std=c++11 -lpthread  -IBOA -IBOA_GPU
 LFLAGS =-IBOA -IBOA_GPU 
 NVCC_LFLAGS= -lcudadevrt
 EXEC=testGPU
@@ -42,6 +42,6 @@ testGPU: bmean.o utils.o bmean_test.o gpu_poa_test.o
 
 clean:
 	rm -rf *.o
-	rm testLR
+	rm testGPU
 
 rebuild: clean $(EXEC)

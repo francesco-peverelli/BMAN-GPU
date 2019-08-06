@@ -9,7 +9,7 @@
 #include <condition_variable>
 #include "bmean_test.h"
 
-#define TEST 0
+#define TEST 1
 
 using namespace std;
 using namespace chrono;
@@ -84,28 +84,27 @@ int main(int argc, char* argv[]) {
 		input = get_random_sample(N_ALIGNMENTS, WLEN, MIN_WLEN, SEQ_LEN, MIN_SLEN);
 	}
 
-	vector<vector<string>> result_BMEAN;
-	vector<vector<string>> result_GPU;
+	vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> result_BMEAN;
+	vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> result_GPU;
 
 #if TEST
 	cout << "CPU start" << endl;
 	
 	auto CPU_start = NOW;
 
-	//result_BMEAN[0] = test_global_consensus(5, input);  
+	result_BMEAN = testMSABMAAC(input); 
 
 	cout << "CPU done" << endl;
 #endif
 	auto CPU_end = NOW;
 
-
 	cout << "*** TASK PRODUCTION COMPLETED ***\n";
-	//result_GPU[0] = test_global_consensus_gpu(5, input);
+	result_GPU = testMSABMAAC_gpu(input);
 	auto GPU_end = NOW;
 	
 #if TEST
 	cout << "Test start" << endl;
-	test_task_batch(result_GPU[0], result_BMEAN[0]);
+	test_MSA_batch(result_GPU, result_BMEAN);
 
 	auto duration_CPU = duration_cast<microseconds>(CPU_end - CPU_start);
 	cout << "CPU time = " << duration_CPU.count() << " microseconds" << endl;

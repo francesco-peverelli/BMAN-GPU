@@ -4,4 +4,7 @@ cd ../..;
 cd BOA;
 make;
 cd ..;
+cd BOA_GPU;
+make;
+cd ..;
 make;

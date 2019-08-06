@@ -29,12 +29,28 @@ extern "C"{
 }
 
 #define GPU_TEST 1
+#define TOUT(str) cout << "[PREP_THREAD " << tid << "]:" << str << "\n";
 
 //TODO REMOVE HASHTABLES
 
 using namespace std;
 
 poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>  *CM;
+
+void execute_gpu_poa(int id, poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> *CM){
+	
+	poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
+	//poa_gpu_utils::SyncMultitaskQueues<vector<string>> &queues = *(cm.poa_queues);
+	
+	execute_poa(cm.get_queues_ref(), cm.task_refs, cm.queue_rdy_mutex, cm.output_rdy_mutex, cm.queue_rdy_var, cm.output_rdy_var, 
+		    cm.exec_notified, cm.flush_mode, cm.processing_required, cm.current_task, cm.previous_task, cm.results,
+		    cm.num_task_types, cm.current_res_index);
+}
+
+void MSABMAAC_gpu_init_ctpl(size_t batch_size, ctpl::thread_pool &my_pool){
+	CM = new poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>(NUM_TASK_TYPES, batch_size);
+	my_pool.push(execute_gpu_poa, CM);
+}
 
 void MSABMAAC_gpu_init(size_t batch_size){
 	CM = new poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>(NUM_TASK_TYPES, batch_size);
@@ -907,6 +923,10 @@ bool needs_poa(const vector<string>& V){
 vector<string> get_easy_consensus(vector<string> V){
 	
 	string result ="";	
+	if(V.size() == 0){
+		cout << "Empty v\n";
+		return {result};
+	}
 
 	for(uint32_t iS(0);iS<V[0].size();++iS){
 		uint32_t cA,cC,cG,cT,cM;
@@ -959,25 +979,33 @@ vector<string> get_easy_consensus(vector<string> V){
 	return {result};
 }
 
-vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(const  vector<vector<string>>& V, uint32_t n, unsigned maxMSA, string path){
+vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, const  vector<vector<string>>& V, uint32_t n, unsigned maxMSA, string path){
 
-	cout << "[PREP_THREAD]: start of preprocessing...\n";
+	//TOUT("start of preprocessing...");
+	int size = V.size();
+	//TOUT("SIZE=" << size );
 	
 	vector<poa_gpu_utils::Task<vector<string>>> task_vector(
 			n, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>())
 	);
+	//TOUT("TVec SIZE=" << task_vector.size() );
 
 	for(uint32_t iV = 0; iV < V.size(); iV++){
 		if(V[iV].size() == 0 || !needs_poa(V[iV])){
-			iV++;
 			n--;
 			task_vector[iV].task_id = -1;
 			task_vector[iV].task_data = V[iV];
+			TOUT("invalid task at " << iV << " " << (int)(V[iV].size() == 0) << " " << (int)!needs_poa(V[iV]) );
+			for(auto s : V[iV])
+				cout << s << "\n";
 			continue;
 		}
+		//TOUT("str assign");
 		task_vector[iV].task_data = V[iV];
-		iV++;
+		//TOUT("valid task: " << task_vector[iV].task_data.size() << " at " << iV);
 	}		      				       
+
+	//TOUT("task vector prep...");
 
 	vector<poa_gpu_utils::TaskType> t_types(n);
 	vector<poa_gpu_utils::Task<vector<string>>> task_to_process(                                                                                                          n, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>())
@@ -985,52 +1013,72 @@ vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(const  vect
 
 	uint32_t iT = 0;
 	for(poa_gpu_utils::Task<vector<string>> &T : task_vector){
-		if(T.task_id > 0){
+		if(T.task_id >= 0){
 			task_to_process[iT] = T;
 			t_types[iT] = poa_gpu_utils::get_task_type<vector<string>>(task_vector[iT]);
 			iT++;
+		}else{
+			TOUT("Invalid task");
 		}
 	}
 
-	cout << "[PREP_THREAD]: determined task types vector...\n";
+	//TOUT("determined task types vector...");
 
 	CM->enqueue_task_vector(task_to_process, t_types);
 
-	cout << "[PREP_THREAD]: tasks enqueued...\n";
+	int i = 0;
+	for(poa_gpu_utils::Task<vector<string>> &T : task_vector){
+		if(T.task_id >= 0){
+			T.task_id = task_to_process[i].task_id;
+			i++;
+		}
+	}	
+
+	return task_vector;
 }
 
 vector<vector<string>> global_consensus_dequeue(vector<poa_gpu_utils::Task<vector<string>>> &task_vector){
 
-	cout << "[POSTP_THREAD]: tasks dequeued...\n";
+	//cout << "[POSTP_THREAD]: tasks dequeued...\n";
 
 	string stacked_consensus = "";
 	vector<vector<string>> result;
 	poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
 
-	unique_lock<mutex> lock(cm.output_rdy_mutex);
-	cm.output_rdy_var.wait(lock);
+	//unique_lock<mutex> lock(cm.output_rdy_mutex);
+	//cm.output_rdy_var.wait(lock);
 
-	cout << "[POSTP_THREAD]: output ready...\n";
+	//cout << "[POSTP_THREAD]: output ready...\n";
 
 	for(poa_gpu_utils::Task<vector<string>> &T : task_vector){
 		if(T.task_id < 0){
 			stacked_consensus += T.task_data[0];
 		}else{
+			//cout << "Res of " << T.task_id << ": ";
+			//for(auto a : cm.results[T.task_id].task_data){ cout << a << "\n"; }
+			cout << "CONSENSUS: " << get_easy_consensus(cm.results[T.task_id].task_data)[0] << "\n"; 
 			stacked_consensus += get_easy_consensus(cm.results[T.task_id].task_data)[0];
 		}
 	}
+	//cout << "RES>>>> " << stacked_consensus << "\n";
 	if(stacked_consensus.size()!=0){
 		// stacked_consensus.erase (remove(stacked_consensus.begin(), stacked_consensus.end(), '-'), stacked_consensus.end());
 		vector<string> vect(1, stacked_consensus);
 		result.push_back(vect);
 		stacked_consensus="";
 	}
-	cout << "[PREP_THREAD]: easy consensus complete...\n";
+	//cout << "[PREP_THREAD]: easy consensus complete...\n";
 	return result;
 }
 
+pair<vector<poa_gpu_utils::Task<vector<string>>>, unordered_map<kmer, unsigned>>
+MSABMAAC_gpu_enqueue_ctpl(int id, const vector<string>& nadine,uint32_t la,double cuisine, unsigned solidThresh, unsigned minAnchors, unsigned maxMSA, string path){
+
+	return MSABMAAC_gpu_enqueue(id, nadine, la, cuisine, solidThresh, minAnchors, maxMSA, path);
+}
+
 pair<vector<poa_gpu_utils::Task<vector<string>>>, unordered_map<kmer, unsigned>> 
-MSABMAAC_gpu_enqueue(const vector<string>& Reads,uint32_t k, double edge_solidity, unsigned solidThresh, unsigned minAnchors, unsigned maxMSA, string path){
+MSABMAAC_gpu_enqueue(int id, const vector<string>& Reads,uint32_t k, double edge_solidity, unsigned solidThresh, unsigned minAnchors, unsigned maxMSA, string path){
 
 #if (GPU_TEST == false)
 
@@ -1063,12 +1111,19 @@ MSABMAAC_gpu_enqueue(const vector<string>& Reads,uint32_t k, double edge_solidit
 	std::unordered_map<kmer, unsigned> merCounts;
 	for(int i = 0; i < 5; i++)
 		result.push_back(Reads);
-#endif	
-
+	if(Reads.size() == 0){ cout << "Reads size reset!\n"; }
 	//consensus preprocessing & eventual enqueue ... 
-	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(result,Reads.size(), maxMSA, path);
-	
+	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(id, result,5, maxMSA, path);
+
+#endif 	
+#if (GPU_TEST == 0)	
+	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(id, result, result.size(), maxMSA, path);
+#endif
 	return std::make_pair(enqueued_tasks, merCounts); 
+}
+
+vector<vector<string>> MSABMAAC_gpu_dequeue_ctpl(int id, vector<poa_gpu_utils::Task<vector<string>>> &task_vector){
+	return MSABMAAC_gpu_dequeue(task_vector);
 }
 
 vector<vector<string>> MSABMAAC_gpu_dequeue(vector<poa_gpu_utils::Task<vector<string>>> &task_vector){
@@ -1092,7 +1147,12 @@ void MSABMAAC_gpu_flush(){
 	
 }
 
-void MSABMAAC_gpu_done(){ delete CM; }
+void MSABMAAC_gpu_done(){ 
+	poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
+	cm.processing_required = false;
+	cm.queue_rdy_var.notify_all();
+	delete CM; 
+}
 
 
 std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsigned>> MSABMAAC(const vector<string>& Reads,uint32_t k, double edge_solidity, unsigned solidThresh, unsigned minAnchors, unsigned maxMSA, string path){
