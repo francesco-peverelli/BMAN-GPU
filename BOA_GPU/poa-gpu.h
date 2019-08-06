@@ -199,7 +199,7 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 
 	T.nseq_offsets = vector<int>(BDIM);
 
-	cout << "Assign device mem\n";
+	//cout << "Assign device mem\n";
 
 	assign_device_memory<SL, MAXL, WL><<<1, 1>>>(T.lpo_edge_offsets_d, T.lpo_letters_d, T.lpo_edges_d, 
 				       T.edge_bounds_d, T.end_nodes_d, T.sequence_ids_d, 
@@ -214,7 +214,7 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 
 	for(int b = 0; b < N_BL; b++){
 
-		cout << "Batch: " << b << "\n";
+		//cout << "Batch: " << b << "\n";
 		
 		int block_offset = b * BDIM;
 		int BLOCKS;
@@ -305,10 +305,10 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 		
 		//cout << "Window formation\n";
 
-		result_GPU[input[block_offset].task_id].task_data = 
+		result_GPU[res_gpu_offs + block_offset].task_data = 
 			form_window<MAXL>(T.result, T.nseq_offsets[0], T.res_size[0]/T.nseq_offsets[0]);
-		result_GPU[input[block_offset].task_id].task_id = input[block_offset].task_id;
-		result_GPU[input[block_offset].task_id].task_index = input[block_offset].task_index;
+		result_GPU[res_gpu_offs + block_offset].task_id = input[block_offset].task_id;
+		result_GPU[res_gpu_offs + block_offset].task_index = input[block_offset].task_index;
 
 		int i = 1;
 		auto i_it_end = input.begin() + block_offset + BLOCKS;
@@ -328,7 +328,7 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 		free(T.sequences);	
 	}
 	
-	cout << "Alignment task completed\n";	
+	//cout << "Alignment task completed\n";	
 
 	/*auto duration_alloc = duration_cast<microseconds>(alloc_end - alloc_begin);
 	auto duration_exec = duration_cast<microseconds>(exec_end - alloc_end);
