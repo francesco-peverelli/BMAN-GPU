@@ -104,7 +104,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 
 	while(processing_required){
 
-		cout << "[EXEC_THREAD]: waiting...\n";
+		//cout << "[EXEC_THREAD]: waiting...\n";
 		
 		q_full_var.wait(lock);
 		is_notified = true;
@@ -138,7 +138,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			vector<Task<vector<string>>> input_tasks;
 			t_queues.retrieve_data_batch(input_tasks, current_task);
 			
-			cout << "[EXEC_THREAD]: exec " << input_tasks.size() << "/" << BATCH_SIZE << " alignments\n";
+			//cout << "[EXEC_THREAD]: exec " << input_tasks.size() << "/" << BATCH_SIZE << " alignments\n";
 
 			auto Tst = NOW;	
 			sel_gpu_POA(input_tasks, task_refs[(int)current_task], result, res_write_idx, current_task);
@@ -148,8 +148,8 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			res_write_idx += input_tasks.size();
 			auto duration_T = duration_cast<microseconds>(Te - Tst);
 			auto duration_A = duration_cast<microseconds>(Ae - Ast);
-			cout << "T time = " << duration_T.count() << " microseconds" << endl;
-			cout << "A time = " << duration_A.count() << " microseconds" << endl;
+			//cout << "T time = " << duration_T.count() << " microseconds" << endl;
+			//cout << "A time = " << duration_A.count() << " microseconds" << endl;
 			
 		}else{
 
@@ -178,7 +178,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 				
 					auto Te = NOW;
 					auto duration_T = duration_cast<microseconds>(Te - Tst);
-					cout << "T time = " << duration_T.count() << " microseconds" << endl;
+					//cout << "T time = " << duration_T.count() << " microseconds" << endl;
 					
 				}
 			}
@@ -186,7 +186,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			cudaDeviceReset();
 			auto end = NOW;
 			auto duration_ = duration_cast<microseconds>(end-start);
-			cout << "exec time = " << duration_.count() << " microseconds" << endl;
+			//cout << "exec time = " << duration_.count() << " microseconds" << endl;
 			
 			t_queues.reset_combined_size();
 			res_write_idx = 0;

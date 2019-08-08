@@ -154,7 +154,7 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 	
 	vector<vector<string>> result_data(input_size);
 
-	cout << "Executing POA: BDIM = " << BDIM << ", BATCHES = " << N_BL << " SL=" << SL << "MAXL=" << MAXL << "WL=" << WL << endl;
+	//cout << "Executing POA: BDIM = " << BDIM << ", BATCHES = " << N_BL << " SL=" << SL << "MAXL=" << MAXL << "WL=" << WL << endl;
 	/*cout << "--- input dump, size=" << input.size() << "\n";
 	for(auto W : input){
 		auto v = W.task_data;

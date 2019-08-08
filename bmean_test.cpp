@@ -188,7 +188,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 	next_job = 0;
 	while(next_job < pool_size && next_job < jobs_to_load){
 		//cout << "[GPU-TEST]: loading job " << next_job << "\n";
-		deq_res[next_job] = my_pool.push(MSABMAAC_gpu_dequeue_ctpl, sched_tasks[next_job]);
+		deq_res[next_job] = my_pool.push(MSABMAAC_gpu_dequeue_ctpl, sched_tasks[next_job], MAX_MSA, SC_PATH);
 		next_job++;
 	}
 
@@ -200,7 +200,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 		result[curr_job].first = deq_res[curr_job].get();
 		curr_job++;
 		//cout << "[GPU-TEST]: loading job " << next_job << "\n";
-		deq_res[next_job] = my_pool.push(MSABMAAC_gpu_dequeue_ctpl, sched_tasks[next_job]);
+		deq_res[next_job] = my_pool.push(MSABMAAC_gpu_dequeue_ctpl, sched_tasks[next_job], MAX_MSA, SC_PATH);
 		next_job++;		
 	}
 
