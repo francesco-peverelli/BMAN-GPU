@@ -981,9 +981,9 @@ vector<string> get_easy_consensus(vector<string> V){
 
 vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, const  vector<vector<string>>& V, uint32_t n, unsigned maxMSA, string path){
 
-	//TOUT("start of preprocessing...");
+	TOUT("start of preprocessing...");
 	int size = V.size();
-	//TOUT("SIZE=" << size );
+	TOUT("SIZE=" << size );
 	
 	vector<poa_gpu_utils::Task<vector<string>>> task_vector(
 			n, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>())
@@ -1011,7 +1011,7 @@ vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, co
 
 	}		      				       
 
-	//TOUT("task vector prep...");
+	TOUT("new_size= " << n << "...");
 
 	vector<poa_gpu_utils::TaskType> t_types(n);
 	vector<poa_gpu_utils::Task<vector<string>>> task_to_process(                                                                                                          n, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>())
@@ -1020,13 +1020,14 @@ vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, co
 	uint32_t iT = 0;
 	for(poa_gpu_utils::Task<vector<string>> &T : task_vector){
 		if(T.task_id >= 0){
+			TOUT("TASK " << iT << "id=" << T.task_id );
 			task_to_process[iT] = T;
-			t_types[iT] = poa_gpu_utils::get_task_type<vector<string>>(task_vector[iT]);
+			t_types[iT] = poa_gpu_utils::get_task_type<vector<string>>(task_to_process[iT]);
 			iT++;
-		}
+		}else{ TOUT("invalid!"); }
 	}
 
-	//TOUT("determined task types vector...");
+	TOUT("determined task types vector...");
 
 	CM->enqueue_task_vector(task_to_process, t_types);
 
@@ -1112,18 +1113,19 @@ MSABMAAC_gpu_enqueue(int id, const vector<string>& Reads,uint32_t k, double edge
 #if GPU_TEST
 	vector<vector<string>> result;
 	std::unordered_map<kmer, unsigned> merCounts;
+	
 	for(int i = 0; i < 5; i++){
-		result.push_back(vector<string>());
-		for(int j = 0; j < Reads.size(); j++){
-			if(j % 2 == 0)
-				result[i].push_back(Reads[j]);
-			else
-				result[i].push_back("");
+		if(i % 2 == 0){
+			result.push_back(Reads);
+		}else{
+			vector<string> R;
+			R.push_back(Reads[0]);
+			result.push_back(R);
 		}
 	}
 	
 	//consensus preprocessing & eventual enqueue ... 
-	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(id, result,5, maxMSA, path);
+	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(id, result,result.size(), maxMSA, path);
 
 #endif 	
 #if (GPU_TEST == 0)	
@@ -1237,13 +1239,14 @@ std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsign
 #if GPU_TEST
 	vector<vector<string>> result;
 	std::unordered_map<kmer, unsigned> merCounts;
+	
 	for(int i = 0; i < 5; i++){
-		result.push_back(vector<string>());
-		for(int j = 0; j < Reads.size(); j++){
-			if(j % 2 == 0)
-				result[i].push_back(Reads[j]);
-			else
-				result[i].push_back("");
+		if(i % 2 == 0){
+			result.push_back(Reads);
+		}else{
+			vector<string> R;
+			R.push_back(Reads[0]);
+			result.push_back(R);
 		}
 	}
 

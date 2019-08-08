@@ -119,7 +119,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 
 vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_gpu(vector<vector<string>> &test_in){
 
-	int pool_size = 64;
+	int pool_size = 2;
 	int jobs_to_load = test_in.size();
 	ctpl::thread_pool my_pool(pool_size);
 	vector< std::future< pair< vector< poa_gpu_utils::Task<vector<string> > >, unordered_map<kmer, unsigned> > > > enq_res(jobs_to_load);

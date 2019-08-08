@@ -48,6 +48,7 @@ class SyncMultitaskQueues{
 				
 				int Ti = 0;
 				for(Task<T> &t : tasks){
+					cout << "TASK " << Ti << ", TType=" << task_types[Ti] << ", id=" << t.task_id << "\n";
 					t.task_id = combined_size + Ti;
 					gpu_task_queues[(int)task_types[Ti]].push_back(t);
 					Ti++;	

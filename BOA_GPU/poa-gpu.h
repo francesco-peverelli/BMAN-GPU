@@ -138,43 +138,6 @@ template<int SL, int MAXL, int WL, int BDIM>                                    
 
 inline void gpu_POA_free(TaskRefs &T, TaskType TTy){
 
-/*
-	cudaErrchk(cudaFree(T.sequences_d));
-	cudaErrchk(cudaFree(T.seq_offsets_d));
-	cudaErrchk(cudaFree(T.nseq_offsets_d));
-	cudaErrchk(cudaFree(T.result_d));
-	cudaErrchk(cudaFree(T.res_size_d));
-
-	cudaErrchk(cudaFree(T.lpo_edge_offsets_d));
-	cudaErrchk(cudaFree(T.lpo_letters_d));
-	cudaErrchk(cudaFree(T.lpo_edges_d));
-	cudaErrchk(cudaFree(T.edge_bounds_d));
-	cudaErrchk(cudaFree(T.end_nodes_d));
-	cudaErrchk(cudaFree(T.sequence_ids_d));
-
-	cudaErrchk(cudaFree(T.new_letters_global_d));
-	cudaErrchk(cudaFree(T.new_edges_global_d));
-	cudaErrchk(cudaFree(T.new_edge_bounds_global_d));
-	cudaErrchk(cudaFree(T.new_end_nodes_global_d));
-	cudaErrchk(cudaFree(T.new_sequence_ids_global_d));
-	
-	cudaErrchk(cudaFree(T.dyn_letters_global_d));
-	cudaErrchk(cudaFree(T.dyn_edges_global_d));
-	cudaErrchk(cudaFree(T.dyn_edge_bounds_global_d));
-	cudaErrchk(cudaFree(T.dyn_end_nodes_global_d));
-	cudaErrchk(cudaFree(T.dyn_sequence_ids_global_d));
-
-	cudaErrchk(cudaFree(T.moves_global_d));
-	cudaErrchk(cudaFree(T.diagonals_global_sc_d));
-	cudaErrchk(cudaFree(T.diagonals_global_gx_d));
-	cudaErrchk(cudaFree(T.diagonals_global_gy_d));
-	cudaErrchk(cudaFree(T.d_offsets_global_d));
-	cudaErrchk(cudaFree(T.x_to_ys_d));
-	cudaErrchk(cudaFree(T.y_to_xs_d));
-
-	cudaErrchk(cudaFree(T.old_len_global_d));
-	cudaErrchk(cudaFree(T.dyn_len_global_d));
-*/
 	cudaDeviceReset();
 	
 	free(T.result);
@@ -192,6 +155,13 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 	vector<vector<string>> result_data(input_size);
 
 	cout << "Executing POA: BDIM = " << BDIM << ", BATCHES = " << N_BL << " SL=" << SL << "MAXL=" << MAXL << "WL=" << WL << endl;
+	/*cout << "--- input dump, size=" << input.size() << "\n";
+	for(auto W : input){
+		auto v = W.task_data;
+		for(auto s : v)
+			cout << s << "\n";
+		cout << "\n";
+	}*/
 
 	T.nseq_offsets = vector<int>(BDIM);
 

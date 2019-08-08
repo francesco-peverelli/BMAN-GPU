@@ -33,7 +33,7 @@ template<typename T>
 class Task{
 
 	public:
-		unsigned long long task_id;
+		long long task_id;
 		unsigned long task_index;
 		T task_data;
 
