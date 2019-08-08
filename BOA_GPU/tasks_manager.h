@@ -35,11 +35,15 @@ class SyncMultitaskQueues{
 			combined_size = 0;
 		}		
 
-		void enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types){
+		void enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types, vector<poa_gpu_utils::Task<T>> &results){
 				
 				lock_guard<mutex> lock(q_mutex);
-
+				
 				int n = tasks.size();
+				size_t new_size = combined_size + n;
+				if(new_size > results.size()){
+					results.resize(new_size, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>()));
+				}
 				bool notify = false;
 				
 				int Ti = 0;
@@ -48,7 +52,7 @@ class SyncMultitaskQueues{
 					gpu_task_queues[(int)task_types[Ti]].push_back(t);
 					Ti++;	
 				}
-				combined_size += n;
+				combined_size = new_size;
 
 				if(!exec_notified){
 					for(auto Tty : task_types){
@@ -65,27 +69,21 @@ class SyncMultitaskQueues{
 					while(!exec_notified)
 						queue_full_var.notify_one(); 	
 				}
-
 				return;
 		}
 
 		void wait_and_flush_queue(){
-
-			cout << "Flush called\n";
+			lock_guard<mutex> lock(q_mutex);
 			mutex my_mutex;
 			unique_lock<mutex> my_lock(my_mutex);
 			condition_variable my_var;
 
 			while(exec_notified){
-				cout << "Waiting for exec to terminate...\n";
 				my_var.wait_for(my_lock, chrono::duration<int>(TIMEOUT), [&]{ return exec_notified == 0; });
 			}
 
-			lock_guard<mutex> lock(q_mutex);
-
 			flush_mode = true;
 			while(!exec_notified){
-				cout << "Exec notified\n";
 				queue_full_var.notify_one();
 			}
 		}
@@ -101,7 +99,10 @@ class SyncMultitaskQueues{
 			return combined_size; 
 		}
 		
-		int get_queue_size(TaskType &t){ return gpu_task_queues[t].size(); }
+		int get_queue_size(TaskType &t){ 
+			lock_guard<mutex> lock(q_mutex);
+			return gpu_task_queues[t].size(); 
+		}
 		
 		void reset_combined_size(){
 			lock_guard<mutex> lock(q_mutex); 
@@ -143,6 +144,7 @@ public:
 	
 	SyncMultitaskConcurrencyManager(int n_task_types, int batch_size) : num_task_types(n_task_types) {
 		task_refs = vector<TaskRefs>(n_task_types);
+		cout <<  task_refs.size() << " task types!\n";
 		poa_queues = new poa_gpu_utils::SyncMultitaskQueues<T>(
 					queue_rdy_var, current_task, n_task_types, exec_notified, flush_mode
      	             	    	 );
@@ -151,11 +153,7 @@ public:
 	~SyncMultitaskConcurrencyManager(){ delete poa_queues; }	
 
 	void enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types){
-		size_t new_size = poa_queues->get_combined_size() + tasks.size();
-		if(new_size > results.size()){
-			results.resize(new_size, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>()));
-		}
-		poa_queues->enqueue_task_vector(tasks, task_types);
+		poa_queues->enqueue_task_vector(tasks, task_types, results);
 	}
 
 	void wait_and_flush_queue(){

@@ -101,6 +101,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 
 	unique_lock<mutex> lock(q_full_mutex);
 	auto start = NOW;
+
 	while(processing_required){
 
 		cout << "[EXEC_THREAD]: waiting...\n";
@@ -110,7 +111,6 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 
 		if(!processing_required) continue;
 
-		cout << "[EXEC_THREAD]: *staring...\n";
 
 		if(!flush_mode){
 
@@ -126,11 +126,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			high_resolution_clock::time_point Ae;
 			if(current_task != prev_task){
 				//do initialization
-				
-				cout << "[EXEC_THREAD]: init...\n";
-
 				if(prev_task != TaskType::UNDEF){
-					cout << "[EXEC_THREAD]: MEM FREE...\n"; 
 					gpu_POA_free(task_refs[(int)prev_task], prev_task);
 				}
 				Ast = NOW;
@@ -138,17 +134,11 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 				Ae = NOW;
 			}	
 
-			cout << "[EXEC_THREAD]: data retrieval...\n"; 
-
 			//do execution
 			vector<Task<vector<string>>> input_tasks;
 			t_queues.retrieve_data_batch(input_tasks, current_task);
 			
 			cout << "[EXEC_THREAD]: exec " << input_tasks.size() << "/" << BATCH_SIZE << " alignments\n";
-
-			//for(auto T : input_tasks){
-			//	cout << "ID=" << T.task_id << "\n";
-			//}
 
 			auto Tst = NOW;	
 			sel_gpu_POA(input_tasks, task_refs[(int)current_task], result, res_write_idx, current_task);
@@ -161,12 +151,6 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			cout << "T time = " << duration_T.count() << " microseconds" << endl;
 			cout << "A time = " << duration_A.count() << " microseconds" << endl;
 			
-			//for(auto T : result){
-			//	cout << "Task << " << T.task_id << ":\n";
-			//	for(auto s : T.task_data)
-			//		cout << s << "\n";
-			//}
-
 		}else{
 
 			cout << "[EXEC_THREAD]: flushing mode...\n";
@@ -189,10 +173,6 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 					vector<Task<vector<string>>> input_tasks;
 					t_queues.retrieve_data_batch(input_tasks, t_type);
 
-					//for(auto T : input_tasks){
-					//	cout << "ID=" << T.task_id << "\n";
-					//}
-
 					sel_gpu_POA(input_tasks, task_refs[TTy], result, res_write_idx, t_type);
 					res_write_idx += input_tasks.size();
 				
@@ -202,6 +182,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 					
 				}
 			}
+			cout << "[EXEC_THREAD]:DEVICE RESET\n";
 			cudaDeviceReset();
 			auto end = NOW;
 			auto duration_ = duration_cast<microseconds>(end-start);
@@ -212,7 +193,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			out_rdy_var.notify_all();
 			
 		}//flush queue code end
-
+		
 		is_notified = false;
 	} //processing_required loop end
 

@@ -119,7 +119,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 
 vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_gpu(vector<vector<string>> &test_in){
 
-	int pool_size = 2;
+	int pool_size = 64;
 	int jobs_to_load = test_in.size();
 	ctpl::thread_pool my_pool(pool_size);
 	vector< std::future< pair< vector< poa_gpu_utils::Task<vector<string> > >, unordered_map<kmer, unsigned> > > > enq_res(jobs_to_load);
@@ -132,7 +132,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 	MSABMAAC_gpu_init_ctpl(BATCH_SIZE, my_pool);
 	pool_size--; //account for the executor thread
 
-	//cout << "[GPU-TEST]: init gpu done\n";
+	cout << "[GPU-TEST]: init gpu done\n";
 
 	//load the first jobs
 	int next_job = 0;
@@ -145,7 +145,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 	pair< vector< poa_gpu_utils::Task<vector<string> > >, unordered_map<kmer, unsigned>> f_res;
 	int curr_job = 0;
 
-	cout << "[GPU-TEST]: progressive enqueue...\n";
+	//cout << "[GPU-TEST]: progressive enqueue...\n";
 
 	while(next_job < jobs_to_load){
 	
@@ -158,11 +158,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 		f_res = enq_res[curr_job].get();
 		//cout << "[GPU-TEST]: get done\n";
 		result[curr_job].second = f_res.second; 
-		//cout << "[GPU-TEST]: =1 done\n"; 
 		sched_tasks[curr_job] = f_res.first;
-		for(auto a : sched_tasks[curr_job])
-		cout << "T ID=" << a.task_id << "\n";
-		//cout << "[GPU-TEST]: =2 done\n"; 
 		curr_job++;
 		//cout << "[GPU-TEST]: loading job " << next_job << "\n";
 		enq_res[next_job] = my_pool.push(MSABMAAC_gpu_enqueue_ctpl,
@@ -178,8 +174,6 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 		f_res = enq_res[curr_job].get();
 		result[curr_job].second = f_res.second;
 		sched_tasks[curr_job] = f_res.first; 
-		for(auto a : sched_tasks[curr_job])
-		cout << "T ID=" << a.task_id << "\n";
 		curr_job++;
 	}
 

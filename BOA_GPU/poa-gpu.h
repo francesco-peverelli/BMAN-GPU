@@ -95,8 +95,6 @@ void init_kernel_block_parameters(vector<Task<vector<string>>> &window_batch, ch
 
 template<int SL, int MAXL, int WL, int BDIM>                                                                                                      inline void gpu_POA_alloc(TaskRefs &T){
 
-	//cout << "Allocating memory for " << SL << " " << WL << " " << MAXL << " " << BDIM << "\n";
-
 	T.result = (char*)malloc(WL * MAXL * BDIM);
 	T.res_size = (int*)malloc(BDIM * sizeof(int));
 
@@ -140,7 +138,6 @@ template<int SL, int MAXL, int WL, int BDIM>                                    
 
 inline void gpu_POA_free(TaskRefs &T, TaskType TTy){
 
-	//cout << "Freeing memory for " << TTy << " \n";
 /*
 	cudaErrchk(cudaFree(T.sequences_d));
 	cudaErrchk(cudaFree(T.seq_offsets_d));
@@ -194,12 +191,9 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 	
 	vector<vector<string>> result_data(input_size);
 
-	cout << "Executing POA: BDIM = " << BDIM << ", BATCHES = " << N_BL << endl;
-	//cudaSetDevice(0);
+	cout << "Executing POA: BDIM = " << BDIM << ", BATCHES = " << N_BL << " SL=" << SL << "MAXL=" << MAXL << "WL=" << WL << endl;
 
 	T.nseq_offsets = vector<int>(BDIM);
-
-	cout << "Assign device mem\n";
 
 	assign_device_memory<SL, MAXL, WL><<<1, 1>>>(T.lpo_edge_offsets_d, T.lpo_letters_d, T.lpo_edges_d, 
 				       T.edge_bounds_d, T.end_nodes_d, T.sequence_ids_d, 
@@ -214,8 +208,6 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 
 	for(int b = 0; b < N_BL; b++){
 
-		cout << "Batch: " << b << "\n";
-		
 		int block_offset = b * BDIM;
 		int BLOCKS;
 		if(b == N_BL-1){
@@ -224,11 +216,11 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 			BLOCKS = BDIM;
 		}
 
-		//cout << "Init kernel parameters\n";
 		init_kernel_block_parameters<BDIM>(input, &T.sequences, T.nseq_offsets, T.seq_offsets, &T.tot_nseq, block_offset);
 		
 		//cout << "Start memcpy\n";
 		//cout << "Memcpy of " << T.seq_offsets[T.tot_nseq-1] << " bytes\n";
+		
 		cudaErrchk(cudaMemcpy(T.sequences_d, T.sequences, T.seq_offsets[T.tot_nseq-1], cudaMemcpyHostToDevice));
 		cudaErrchk(cudaMemcpy(T.seq_offsets_d, T.seq_offsets.data(), T.tot_nseq * sizeof(int), cudaMemcpyHostToDevice));
 		cudaErrchk(cudaMemcpy(T.nseq_offsets_d, T.nseq_offsets.data(), (unsigned long long)BLOCKS * sizeof(int), cudaMemcpyHostToDevice));
@@ -302,8 +294,6 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 		cudaErrchk(cudaMemcpy(T.res_size, T.res_size_d, BDIM * sizeof(int), cudaMemcpyDeviceToHost));
 		//cout << "mcpy2\n";
 		cudaErrchk(cudaMemcpy(T.result, T.result_d, T.res_size[BLOCKS-1], cudaMemcpyDeviceToHost));
-		
-		//cout << "Window formation\n";
 
 		result_GPU[input[block_offset].task_id].task_data = 
 			form_window<MAXL>(T.result, T.nseq_offsets[0], T.res_size[0]/T.nseq_offsets[0]);
@@ -327,8 +317,6 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 
 		free(T.sequences);	
 	}
-	
-	cout << "Alignment task completed\n";	
 
 	/*auto duration_alloc = duration_cast<microseconds>(alloc_end - alloc_begin);
 	auto duration_exec = duration_cast<microseconds>(exec_end - alloc_end);

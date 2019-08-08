@@ -8,10 +8,10 @@
 
 namespace poa_gpu_utils{
 
-void sel_gpu_POA_alloc(TaskRefs &TR, TaskType& TTy);
+//void sel_gpu_POA_alloc(TaskRefs &TR, TaskType& TTy);
 
-void sel_gpu_POA(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, vector<Task<vector<string>>> &total_res_GPU, 
-		 int res_write_idx, TaskType& TTy);
+//void sel_gpu_POA(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, vector<Task<vector<string>>> &total_res_GPU, 
+//		 int res_write_idx, TaskType& TTy);
 
 void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs> &task_refs, 
 				 mutex& q_full_mutex, mutex& out_rdy_mutex, 

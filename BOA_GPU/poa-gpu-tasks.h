@@ -27,8 +27,6 @@ static map<TaskType, int> task_batch_size = {
 	{TaskType::POA_16_64, BLOCK_DIM_16_64 * N_BLOCKS },
 	{TaskType::POA_16_128, BLOCK_DIM_16_128 * N_BLOCKS },
 	{TaskType::POA_16_255, BLOCK_DIM_16_255 * N_BLOCKS }
-
-
 };
 
 template<typename T>

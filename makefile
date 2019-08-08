@@ -2,7 +2,7 @@
 CXX= g++
 CXX_GPU= nvcc
 NVCC_W= -w
-CFLAGS = -G -g -O3 -std=c++11 -lpthread  -IBOA -IBOA_GPU
+CFLAGS = -O3 -std=c++11 -lpthread  -IBOA -IBOA_GPU
 LFLAGS =-IBOA -IBOA_GPU 
 NVCC_LFLAGS= -lcudadevrt
 EXEC=testGPU
