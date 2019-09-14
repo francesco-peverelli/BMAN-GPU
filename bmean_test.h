@@ -20,6 +20,8 @@ void test_MSA_batch(vector<pair<vector<vector<string>>, unordered_map<kmer, unsi
 
 vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC(vector<vector<string>> &test_in);
 
+vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_pool(vector<vector<string>> &test_in);
+
 vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_gpu(vector<vector<string>> &test_in);
 	
 vector<string> generate_random_window(int max_L, int min_L, int max_N);

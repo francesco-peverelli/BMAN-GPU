@@ -49,6 +49,26 @@
 #define MAX_SEQ_16_255 960
 #define BLOCK_DIM_16_255 7000
 
+#define WLEN_32_32 32
+#define SEQ_LEN_32_32 31
+#define MAX_SEQ_32_32 160
+#define BLOCK_DIM_32_32 150000
+
+#define WLEN_32_64 32
+#define SEQ_LEN_32_64 63
+#define MAX_SEQ_32_64 352
+#define BLOCK_DIM_32_64 50000
+
+#define WLEN_32_128 32	
+#define SEQ_LEN_32_128 127
+#define MAX_SEQ_32_128 512
+#define BLOCK_DIM_32_128 20000
+
+#define WLEN_32_255 32
+#define SEQ_LEN_32_255 255
+#define MAX_SEQ_32_255 960
+#define BLOCK_DIM_32_255 5000
+
 #define EDGE_F 3
 #define N_THREADS 64
 

@@ -24,14 +24,8 @@ static map<int,char> char_map = { { 0, 'A' }, { 1, 'C' }, { 2, 'G' }, { 3, 'T' }
 
 vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int batch_size){
 	
-	ifstream file;
-	file.open(filepath);
-	if(file.fail()){
-		throw ios_base::failure(strerror(errno));
-	}
+	ifstream file(filepath);
 
-	file.exceptions(file.exceptions() | ios::failbit | ifstream::badbit);
-	
 	string line;
 	unsigned long long collected_samples = 0;
 	vector<vector<string>> batch;
@@ -53,7 +47,7 @@ vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int ba
 		}else{
 
 			bool window_ok = true;
-			if(current_window.size() > max_W)
+			/*if(current_window.size() > max_W)
 				window_ok = false;
 
 			int max_size = 0;
@@ -68,13 +62,13 @@ vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int ba
 			}
 			if(max_size < max_N / 2){ //we assume to distribute sequences with a doubling rule
 				window_ok = false;
-			}
+			}*/
 			if(window_ok){
 				batch.push_back(current_window);
 				collected_samples++;
 				printed = false;
 			}
-			current_window.clear();
+			vector<string>().swap(current_window);
 		}
 		if(collected_samples % step == 0 && !printed){
 			cout << "Collected samples: " << collected_samples << "/" << batch_size << ", line " << lineno << endl;
@@ -82,13 +76,7 @@ vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int ba
 		}
 	}
 	cout << "out of loop" << endl;
-	if(file.bad()){
-		throw ios_base::failure(strerror(errno));
-	}
 
-	file.exceptions(file.exceptions() | ios::failbit | ifstream::badbit);
-	
-	file.close();
 
 	cout << "*** SAMPLE COLLECTION COMPLETE ***" << endl;
 	cout << "Collected (" << collected_samples << "/" << batch_size << ") samples from reads set" << endl;
@@ -117,9 +105,40 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 	return res;
 }
 
+pair<vector<vector<string>>, unordered_map<kmer, unsigned>> MSABMAAC_ctpl(int id, const vector<string>& nadine,uint32_t la,double cuisine, unsigned solidThresh, unsigned minAnchors, unsigned maxMSA, string path){
+	return  MSABMAAC(nadine,la,cuisine,solidThresh,minAnchors,maxMSA,path);
+}
+
+vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_pool(vector<vector<string>> &test_in){
+	
+	int pool_size = 1000;
+	int jobs_to_load = test_in.size();
+	ctpl::thread_pool my_pool(pool_size);
+	vector<future<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>>> res(jobs_to_load);
+	vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> result(jobs_to_load);
+	int next_job = 0;
+	while(next_job < pool_size && next_job < jobs_to_load){
+		res[next_job] = my_pool.push(MSABMAAC_ctpl, test_in[next_job], K, EDGE_SOLIDITY, SOLID_THRESH, MIN_ANCHORS, MAX_MSA, SC_PATH);
+		next_job++;
+	}
+	int curr_job = 0;
+	while(next_job < jobs_to_load){
+		result[curr_job] = res[curr_job].get();
+		curr_job++;
+		res[next_job] = my_pool.push(MSABMAAC_ctpl, test_in[next_job], K, EDGE_SOLIDITY, SOLID_THRESH, MIN_ANCHORS, MAX_MSA, SC_PATH);
+		next_job++;
+	}
+
+	while(curr_job < jobs_to_load){
+		result[curr_job] = res[curr_job].get();
+		curr_job++;
+	}
+	return result;
+}
+
 vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_gpu(vector<vector<string>> &test_in){
 
-	int pool_size = 2;
+	int pool_size = 1000;
 	int jobs_to_load = test_in.size();
 	ctpl::thread_pool my_pool(pool_size);
 	vector< std::future< pair< vector< poa_gpu_utils::Task<vector<string> > >, unordered_map<kmer, unsigned> > > > enq_res(jobs_to_load);
@@ -197,6 +216,7 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 	curr_job = 0;
 	while(next_job < jobs_to_load){
 		
+		//deq_res[curr_job].wait();
 		result[curr_job].first = deq_res[curr_job].get();
 		curr_job++;
 		//cout << "[GPU-TEST]: loading job " << next_job << "\n";

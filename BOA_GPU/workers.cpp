@@ -19,6 +19,15 @@ template void gpu_POA<SEQ_LEN_16_128, MAX_SEQ_16_128, WLEN_16_128, BLOCK_DIM_16_
 template void gpu_POA<SEQ_LEN_16_255, MAX_SEQ_16_255, WLEN_16_255, BLOCK_DIM_16_255>(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, 
 								         vector<Task<vector<string>>> &total_res_GPU, int res_write_idx);  
 
+template void gpu_POA<SEQ_LEN_32_32, MAX_SEQ_32_32, WLEN_32_32, BLOCK_DIM_32_32>(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, 
+								     vector<Task<vector<string>>> &total_res_GPU, int res_write_idx);
+template void gpu_POA<SEQ_LEN_32_64, MAX_SEQ_32_64, WLEN_32_64, BLOCK_DIM_32_64>(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, 
+								     vector<Task<vector<string>>> &total_res_GPU, int res_write_idx);  
+template void gpu_POA<SEQ_LEN_32_128, MAX_SEQ_32_128, WLEN_32_128, BLOCK_DIM_32_128>(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, 
+								         vector<Task<vector<string>>> &total_res_GPU, int res_write_idx);  
+template void gpu_POA<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255, BLOCK_DIM_32_255>(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, 
+								         vector<Task<vector<string>>> &total_res_GPU, int res_write_idx);  
+
 
 void sel_gpu_POA_alloc(TaskRefs &TR, TaskType& TTy){
 
@@ -47,6 +56,18 @@ void sel_gpu_POA_alloc(TaskRefs &TR, TaskType& TTy){
 			break;
 		case TaskType::POA_16_255:
 			gpu_POA_alloc<SEQ_LEN_16_255, MAX_SEQ_16_255, WLEN_16_255, BLOCK_DIM_16_255>(TR);
+			break;
+		case TaskType::POA_32_32:
+			gpu_POA_alloc<SEQ_LEN_32_32, MAX_SEQ_32_32, WLEN_32_32, BLOCK_DIM_32_32>(TR);
+			break;
+		case TaskType::POA_32_64:
+                        gpu_POA_alloc<SEQ_LEN_32_64, MAX_SEQ_32_64, WLEN_32_64, BLOCK_DIM_32_64>(TR);
+			break;
+		case TaskType::POA_32_128:
+                        gpu_POA_alloc<SEQ_LEN_32_128, MAX_SEQ_32_128, WLEN_32_128, BLOCK_DIM_32_128>(TR);
+			break;
+		case TaskType::POA_32_255:
+			gpu_POA_alloc<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255, BLOCK_DIM_32_255>(TR);
 			break;
 		default:
 			cout << "Unsupported task type!\n";
@@ -84,6 +105,18 @@ void sel_gpu_POA(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, vector
 		case TaskType::POA_16_255:
                         gpu_POA<SEQ_LEN_16_255, MAX_SEQ_16_255, WLEN_16_255, BLOCK_DIM_16_255>(input_tasks, TR, total_res_GPU, res_write_idx);
 			break;
+		case TaskType::POA_32_32:
+			gpu_POA<SEQ_LEN_32_32, MAX_SEQ_32_32, WLEN_32_32, BLOCK_DIM_32_32>(input_tasks, TR, total_res_GPU, res_write_idx);
+			break;
+		case TaskType::POA_32_64:
+                        gpu_POA<SEQ_LEN_32_64, MAX_SEQ_32_64, WLEN_32_64, BLOCK_DIM_32_64>(input_tasks, TR, total_res_GPU, res_write_idx);
+			break;
+		case TaskType::POA_32_128:
+                        gpu_POA<SEQ_LEN_32_128, MAX_SEQ_32_128, WLEN_32_128, BLOCK_DIM_32_128>(input_tasks, TR, total_res_GPU, res_write_idx);
+			break;
+		case TaskType::POA_32_255:
+                        gpu_POA<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255, BLOCK_DIM_32_255>(input_tasks, TR, total_res_GPU, res_write_idx);
+			break;
 		default:
 			cout << "Unsupported task type!\n";
 			break;
@@ -101,6 +134,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 
 	unique_lock<mutex> lock(q_full_mutex);
 	auto start = NOW;
+	auto cumul_GPU = NOW - NOW;
 
 	while(processing_required){
 
@@ -138,16 +172,14 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			vector<Task<vector<string>>> input_tasks;
 			t_queues.retrieve_data_batch(input_tasks, current_task);
 			
-			//cout << "[EXEC_THREAD]: exec " << input_tasks.size() << "/" << BATCH_SIZE << " alignments\n";
-
 			auto Tst = NOW;	
 			sel_gpu_POA(input_tasks, task_refs[(int)current_task], result, res_write_idx, current_task);
 			auto Te = NOW;
-	
+			
+			cumul_GPU += (Te - Tst); 
+
 			prev_task = current_task;
 			res_write_idx += input_tasks.size();
-			auto duration_T = duration_cast<microseconds>(Te - Tst);
-			auto duration_A = duration_cast<microseconds>(Ae - Ast);
 			//cout << "T time = " << duration_T.count() << " microseconds" << endl;
 			//cout << "A time = " << duration_A.count() << " microseconds" << endl;
 			
@@ -177,7 +209,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 					res_write_idx += input_tasks.size();
 				
 					auto Te = NOW;
-					auto duration_T = duration_cast<microseconds>(Te - Tst);
+					cumul_GPU += (Te - Tst);
 					//cout << "T time = " << duration_T.count() << " microseconds" << endl;
 					
 				}
@@ -186,7 +218,9 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			cudaDeviceReset();
 			auto end = NOW;
 			auto duration_ = duration_cast<microseconds>(end-start);
-			//cout << "exec time = " << duration_.count() << " microseconds" << endl;
+			cout << "exec time = " << duration_.count() << " microseconds" << endl;
+			auto gpu_duration = duration_cast<microseconds>(cumul_GPU);
+			cout << "gpu time = " << gpu_duration.count() << " microseconds" << endl;
 			
 			t_queues.reset_combined_size();
 			res_write_idx = 0;

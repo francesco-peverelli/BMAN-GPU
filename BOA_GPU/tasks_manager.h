@@ -220,6 +220,23 @@ inline TaskType get_task_type<vector<string>>(Task<vector<string>> &task){
 		else
 			return TaskType::POA_CPU;
 
+	}else if(W <= 32){
+		for(auto s : task_data){
+			int sz = s.size();
+			if(max_s < sz){
+				max_s = sz;
+			}
+		}
+		if(max_s <= SEQ_LEN_32_32)
+			return TaskType::POA_32_32;
+		else if(max_s <= SEQ_LEN_32_64)
+			return TaskType::POA_32_64;
+		else if(max_s <= SEQ_LEN_32_128)
+			return TaskType::POA_32_128;
+		else if(max_s <= SEQ_LEN_32_255)
+			return TaskType::POA_32_255;
+		else
+			return TaskType::POA_CPU;
 	}else{
 		return TaskType::POA_CPU;
 	}

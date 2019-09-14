@@ -4,7 +4,7 @@
 #include<map>
 #include "poa-constants.h"
 
-#define NUM_TASK_TYPES 9
+#define NUM_TASK_TYPES 13
 #define N_BLOCKS 8
 
 using namespace std;
@@ -15,7 +15,7 @@ typedef short Edge;
 
 enum TaskType{ UNDEF = -1, POA_8_32 = 0, POA_8_64 = 1, POA_8_128 = 2, POA_8_255 = 3, 
 	       POA_16_32 = 4, POA_16_64 = 5, POA_16_128 = 6, POA_16_255 = 7, 
-	       POA_CPU = 8 };
+	       POA_32_32 = 8, POA_32_64 = 9, POA_32_128 = 10, POA_32_255 = 11, POA_CPU = 12 };
 
 static map<TaskType, int> task_batch_size = {
 	{TaskType::UNDEF, -1 },
@@ -26,7 +26,13 @@ static map<TaskType, int> task_batch_size = {
 	{TaskType::POA_16_32, BLOCK_DIM_16_32 * N_BLOCKS },
 	{TaskType::POA_16_64, BLOCK_DIM_16_64 * N_BLOCKS },
 	{TaskType::POA_16_128, BLOCK_DIM_16_128 * N_BLOCKS },
-	{TaskType::POA_16_255, BLOCK_DIM_16_255 * N_BLOCKS }
+	{TaskType::POA_16_255, BLOCK_DIM_32_255 * N_BLOCKS },
+	{TaskType::POA_32_32, BLOCK_DIM_32_32 * N_BLOCKS },
+	{TaskType::POA_32_64, BLOCK_DIM_32_64 * N_BLOCKS },
+	{TaskType::POA_32_128, BLOCK_DIM_32_128 * N_BLOCKS },
+	{TaskType::POA_32_255, BLOCK_DIM_32_255 * N_BLOCKS }
+
+
 };
 
 template<typename T>
