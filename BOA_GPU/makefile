@@ -1,7 +1,7 @@
 COMPILER = g++
 COMPILER_GPU = nvcc
 CC = gcc
-CFLAGS = -O3 -std=c++11 -lpthread
+CFLAGS = -g -O3 -std=c++11 -lpthread
 INCLUDE_CUDA = -I /usr/local/cuda-10.1/include/ 
 
 #BMEAN_LIB = $(BMEAN_DIR)/bmean.o $(BMEAN_DIR)/utils.o 

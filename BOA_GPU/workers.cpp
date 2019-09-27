@@ -133,8 +133,6 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 	cout << "[EXEC_THREAD]: exec thread activated\n";
 
 	unique_lock<mutex> lock(q_full_mutex);
-	auto start = NOW;
-	auto cumul_GPU = NOW - NOW;
 
 	while(processing_required){
 
@@ -156,28 +154,22 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 				exit(-1);
 			} 		
 
-			high_resolution_clock::time_point Ast;
-			high_resolution_clock::time_point Ae;
 			if(current_task != prev_task){
 				//do initialization
 				if(prev_task != TaskType::UNDEF){
 					gpu_POA_free(task_refs[(int)prev_task], prev_task);
 				}
-				Ast = NOW;
 				sel_gpu_POA_alloc(task_refs[(int)current_task], current_task);
-				Ae = NOW;
 			}	
 
 			//do execution
 			vector<Task<vector<string>>> input_tasks;
 			t_queues.retrieve_data_batch(input_tasks, current_task);
 			
-			auto Tst = NOW;	
-			sel_gpu_POA(input_tasks, task_refs[(int)current_task], result, res_write_idx, current_task);
-			auto Te = NOW;
-			
-			cumul_GPU += (Te - Tst); 
+			cout << "Executing batch of " << input_tasks.size() << "\n";
 
+			sel_gpu_POA(input_tasks, task_refs[(int)current_task], result, res_write_idx, current_task);
+			
 			prev_task = current_task;
 			res_write_idx += input_tasks.size();
 			//cout << "T time = " << duration_T.count() << " microseconds" << endl;
@@ -200,27 +192,21 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 				}
 				if(t_queues.get_queue_size(t_type) != 0){
 					prev_batch_executed = true;
-					auto Tst = NOW;
 					sel_gpu_POA_alloc(task_refs[TTy], t_type);
 					vector<Task<vector<string>>> input_tasks;
 					t_queues.retrieve_data_batch(input_tasks, t_type);
 
+					cout << "Executing batch of " << input_tasks.size() << "\n";		
+
 					sel_gpu_POA(input_tasks, task_refs[TTy], result, res_write_idx, t_type);
 					res_write_idx += input_tasks.size();
 				
-					auto Te = NOW;
-					cumul_GPU += (Te - Tst);
 					//cout << "T time = " << duration_T.count() << " microseconds" << endl;
 					
 				}
 			}
 			cout << "[EXEC_THREAD]:DEVICE RESET\n";
 			cudaDeviceReset();
-			auto end = NOW;
-			auto duration_ = duration_cast<microseconds>(end-start);
-			cout << "exec time = " << duration_.count() << " microseconds" << endl;
-			auto gpu_duration = duration_cast<microseconds>(cumul_GPU);
-			cout << "gpu time = " << gpu_duration.count() << " microseconds" << endl;
 			
 			t_queues.reset_combined_size();
 			res_write_idx = 0;

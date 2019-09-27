@@ -5,7 +5,7 @@
 #include<condition_variable>
 #include<iostream>
 
-#define TIMEOUT 10
+#define TIMEOUT 2
 
 using namespace std;
 

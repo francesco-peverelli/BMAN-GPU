@@ -36,6 +36,8 @@ void MSABMAAC_gpu_flush();
 
 void MSABMAAC_gpu_init_ctpl(size_t batch_size, ctpl::thread_pool &my_pool);
 
+void MSABMAAC_gpu_init_batch(size_t batch_size, thread &exec_t);
+
 void MSABMAAC_gpu_init(size_t batch_size);
 
 void MSABMAAC_gpu_done();
@@ -43,5 +45,6 @@ void MSABMAAC_gpu_done();
 vector<vector<string>> MSABMAAC_gpu_dequeue(vector<poa_gpu_utils::Task<vector<string>>> &task_vector, unsigned maxMSA, string path); 
 
 vector<vector<string>> MSABMAAC_gpu_dequeue_ctpl(int id, vector<poa_gpu_utils::Task<vector<string>>> &task_vector, unsigned maxMSA, string path);      
+bool needs_poa(const vector<string>& V);
 
 #endif

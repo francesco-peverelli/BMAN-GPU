@@ -93,14 +93,15 @@ int main(int argc, char* argv[]) {
 	auto CPU_start = NOW;
 
 	result_BMEAN = testMSABMAAC_pool(input); 
-	
-#endif	
-	auto CPU_end1 = NOW;
 
 	cout << "CPU done" << endl;
-
+#endif
 	auto CPU_end = NOW;
-	result_GPU = testMSABMAAC_gpu(input);
+
+	cout << "GPU start\n";
+	
+	result_GPU = testMSABMAAC_gpu_std(input);
+	
 	auto GPU_end = NOW;
 	
 #if TEST

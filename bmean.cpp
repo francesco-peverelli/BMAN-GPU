@@ -36,10 +36,24 @@ using namespace std;
 poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>  *CM;
 
 mutex p_mtx;
-auto offl = NOW - NOW;
 int offlw = 0;
 int trivw = 0;
 int gpuw = 0;
+int longw = 0;
+long maxw = 0;
+
+mutex t_mtx;
+int64_t anch_avg = 0;
+int64_t kmr_avg = 0;
+int64_t cons_avg = 0;
+int64_t tot_avg = 0;
+int64_t n_tasks = 0;
+
+int64_t anch_CPU = 0;
+int64_t kmr_CPU = 0;
+int64_t cons_CPU = 0;
+int64_t tot_CPU = 0;
+int64_t CPU_tasks = 0;
 
 
 void safe_print(const char* s, int tid){
@@ -61,6 +75,11 @@ void execute_gpu_poa(int id, poa_gpu_utils::SyncMultitaskConcurrencyManager<vect
 void MSABMAAC_gpu_init_ctpl(size_t batch_size, ctpl::thread_pool &my_pool){
 	CM = new poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>(NUM_TASK_TYPES, batch_size);
 	my_pool.push(execute_gpu_poa, CM);
+}
+
+void MSABMAAC_gpu_init_batch(size_t batch_size, std::thread &exec_t){
+	CM = new poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>(NUM_TASK_TYPES, batch_size);  
+	exec_t = thread(execute_gpu_poa, 0, CM);
 }
 
 void MSABMAAC_gpu_init(size_t batch_size){
@@ -197,11 +216,18 @@ void clean_suspcious_reads(kmer2localisation& kmer_index, uint read_number,doubl
 bool order_according2read_id (localisation i,localisation j) { return (i.read_id<j.read_id); }
 
 
-
 int anchors_ordered_according2reads(const kmer kmer1,const kmer kmer2,  kmer2localisation& kmer_index){
 	int32_t result(0);
 	auto v_loc1(kmer_index[kmer1]);
 	auto v_loc2(kmer_index[kmer2]);
+	
+	//string s = "";
+	//for(int i = 0; i < v_loc1.size(); i++){
+	//	s+= "[" + to_string(i) + "," + to_string(v_loc1.size()) + "](" 
+	//		+ to_string(v_loc1[i].read_id) + "," + to_string(v_loc1[i].position) + ")\n";
+	//}
+	//safe_print(s.c_str(), 0);
+
 	//~ sort (v_loc1.begin(), v_loc1.end(), order_according2read_id);
 	//~ sort (v_loc2.begin(), v_loc2.end(), order_according2read_id);
 	uint32_t i1(0),i2(0);
@@ -225,12 +251,52 @@ int anchors_ordered_according2reads(const kmer kmer1,const kmer kmer2,  kmer2loc
 	return result;
 }
 
+void lower_kmer_structures( kmer2localisation& kmer_index, const vector<kmer>& template_read ){
+
+	size_t r_size = template_read.size();
+	vector<localisation> loc_v;
+	vector<int> loc_offs;
+	int curr_loc_offs = 0;
+
+	for(kmer k : template_read){
+	
+		vector<localisation> &loc_k = kmer_index[k];
+		curr_loc_offs += loc_k.size();
+		loc_offs.push_back(curr_loc_offs);
+		//string s = "Size: = " + to_string(curr_loc_offs) + "\n";
+		//safe_print(s.c_str(),0);
+		for(localisation l : loc_k){
+			loc_v.push_back(l);
+		}
+	}
+
+	localisation* k_positions = loc_v.data();
+	size_t pos_size = loc_v.size();
+	int* pos_offsets = loc_offs.data();
+	int* S = (int*)malloc(r_size * r_size * sizeof(int));
+
+	//string outs = "\n";
+	///outs += "loc_v size= " + to_string(loc_v.size()) + "r_size=" + to_string(r_size) + "\n";
+	//for(int i = 0; i < r_size; i++)
+	//	outs += to_string(pos_offsets[i]) + " ";
+	//outs += "\n";
+	//for(int i = 0; i < pos_offsets[r_size-1]; i++){
+	//	localisation &l = k_positions[i];
+	//	outs += "(" + to_string(l.read_id) + "," + to_string(l.position) + ") ";
+	//}
+	//outs += "\n";
+
+	//safe_print(outs.c_str(), 0);
+	//exit(-1);
+}
 
 
 score_chain longest_ordered_chain_from_anchors( kmer2localisation& kmer_index, unordered_map<uint,score_chain>& best_chain_computed, uint32_t start, const vector<kmer>& template_read,double edge_solidity){
+
 	if(best_chain_computed.count(start)==1){
 		return best_chain_computed[start];
 	}
+
 	int32_t max_chain(-1),max_score(0);
 	int32_t next_anchor(-1);
 	for(uint i(start+1);i<template_read.size();++i){
@@ -277,13 +343,20 @@ vector<kmer> get_template( kmer2localisation& kmer_index,const string& read,int 
 
 
 vector<kmer> longest_ordered_chain( kmer2localisation& kmer_index,const vector<kmer>& template_read, double edge_solidity){
+	
 	unordered_map<uint,score_chain> best_chain_computed;
-    vector<kmer> result;
-    int32_t max_chain(0),max_score(0);
+   	vector<kmer> result;
+   	
+	lower_kmer_structures( kmer_index, template_read );
+
+	int32_t max_chain(0),max_score(0);
 	int32_t next_anchor(-1);
-    for(int32_t i(template_read.size()-1);i>=0;--i){
-        auto p=longest_ordered_chain_from_anchors(kmer_index,best_chain_computed,i,template_read,edge_solidity);
-        if(p.length>max_chain){
+    
+	for(int32_t i(template_read.size()-1);i>=0;--i){
+        	
+		auto p=longest_ordered_chain_from_anchors(kmer_index,best_chain_computed,i,template_read,edge_solidity);
+        	
+		if(p.length>max_chain){
 			max_chain=p.length;
 			max_score=p.score;
 			next_anchor=i;
@@ -1018,34 +1091,24 @@ vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, co
 	);
 	vector<poa_gpu_utils::TaskType> t_types(n);
 	
-	int c1 = 0;
-	int c2= 0;
-	int c3= 0;
 
 	uint32_t iTy = 0;
 	for(uint32_t iV = 0; iV < V.size(); iV++){
 	
 		task_vector[iV].task_data = V[iV];
-		if(task_vector[iV].task_data.size()==0){ 
-			//TOUT("Empty at enqueue..\n");
-			//exit(-1); 
-		}
 		t_types[iTy] = poa_gpu_utils::get_task_type<vector<string>>(task_vector[iV]);
 		
 		if(V[iV].size() == 0 || !needs_poa(V[iV])){
-			c1++;
 			n--;
 			task_vector[iV].task_id = -1;
 			//TOUT("no POA /empty");
 			t_types.erase(t_types.begin() + iTy);
 		}else if(t_types[iTy] == poa_gpu_utils::TaskType::POA_CPU){
-			c2++;
 			n--;
 			task_vector[iV].task_id = -2;
 			//TOUT("OFFLOAD");
 		     	t_types.erase(t_types.begin() + iTy);	
 		}else{
-			c3++;
 			//remove empty elements first from each valid task
 			task_vector[iV].task_data.erase(
 				remove_if(
@@ -1058,12 +1121,12 @@ vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, co
 			iTy++;
 			//TOUT("poa GPU");
 		}
-	}		      				       
-
-	vector<poa_gpu_utils::Task<vector<string>>> task_to_process(                                                                                                          n, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>())
-	);
+	}		      			
 
 	uint32_t iT = 0;
+	vector<poa_gpu_utils::Task<vector<string>>> task_to_process(                                                                                                          n, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>())
+				);
+
 	for(poa_gpu_utils::Task<vector<string>> &T : task_vector){
 		if(T.task_id >= 0){
 			task_to_process[iT] = T;
@@ -1113,10 +1176,7 @@ vector<vector<string>> global_consensus_dequeue(vector<poa_gpu_utils::Task<vecto
 		}else if(T.task_id == -2){
 			//CPU offload of the task
 			//cout << "[POSTP_THREAD]: offload...\n"; 
-			auto Os = NOW;
 			stacked_consensus += easy_consensus(T.task_data, maxMSA, path)[0];
-			auto Oe = NOW;
-			offl += Oe - Os;
 			offlw++;
 		}else{
 			//cout << "[POSTP_THREAD]: ge cons...\n";  
@@ -1147,6 +1207,8 @@ MSABMAAC_gpu_enqueue(int id, const vector<string>& Reads,uint32_t k, double edge
 
 #if (GPU_TEST == false)
 
+	//auto kmr_t = NOW;
+
 	int kmer_size(k);
 	kmer2localisation kmer_index;
 	std::unordered_map<kmer, unsigned> merCounts;
@@ -1156,6 +1218,8 @@ MSABMAAC_gpu_enqueue(int id, const vector<string>& Reads,uint32_t k, double edge
 	auto kmer_count(filter_index_kmers(kmer_index,edge_solidity));
 
 	auto template_read(get_template(kmer_index,Reads[0],kmer_size));
+
+	//auto anch_t = NOW;
 
 	vector<kmer> anchors(longest_ordered_chain(kmer_index, template_read,edge_solidity));
 
@@ -1189,8 +1253,27 @@ MSABMAAC_gpu_enqueue(int id, const vector<string>& Reads,uint32_t k, double edge
 	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(id, result,result.size(), maxMSA, path);
 
 #endif 	
+
 #if (GPU_TEST == 0)	
+
+	//auto cons_t = NOW;
+
 	vector<poa_gpu_utils::Task<vector<string>>> enqueued_tasks = global_consensus_enqueue(id, result, result.size(), maxMSA, path);
+	
+	//auto end = NOW;
+	
+	//t_mtx.lock();
+	//n_tasks++;
+	//int64_t tot = duration_cast<microseconds>(end - kmr_t).count();
+	//int64_t kmr = duration_cast<microseconds>(anch_t - kmr_t).count();
+	//int64_t anch = duration_cast<microseconds>(cons_t - anch_t).count();
+	//int64_t cons = duration_cast<microseconds>(end - cons_t).count();
+
+	//tot_avg += (tot - tot_avg) / n_tasks;
+	//kmr_avg += (kmr - kmr_avg) / n_tasks;
+	//anch_avg += (anch - anch_avg) / n_tasks;
+	//cons_avg += (cons - cons_avg) / n_tasks;
+	//t_mtx.unlock();
 #endif
 	return std::make_pair(enqueued_tasks, merCounts); 
 }
@@ -1223,16 +1306,22 @@ void MSABMAAC_gpu_flush(){
 	while(cm.exec_notified){
 		cm.output_rdy_var.wait_for(lock, chrono::duration<int>(TIMEOUT), [&]{ return cm.exec_notified == 0; });
 	}
-	
 }
 
 void MSABMAAC_gpu_done(){ 
 	poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
 	cm.processing_required = false;
 	cm.queue_rdy_var.notify_all();
-	auto d = duration_cast<microseconds>(offl);
-	cout << "offload: " << d.count() << endl;
-	cout << "T=" << trivw << "\nG =" << gpuw << "\nO = " << offlw << endl;
+	/*cout << "Tot=" << tot_avg << "\n";
+        cout << "Kmer=" << kmr_avg << "\n";
+	cout << "Anch=" << anch_avg << "\n";
+	cout << "Cons=" << cons_avg << "\n";	
+	cout << "Tot_CPU=" << tot_CPU << "\n";
+        cout << "Kmer_CPU=" << kmr_CPU << "\n";
+	cout << "Anch_CPU=" << anch_CPU << "\n";
+	cout << "Cons_CPU=" << cons_CPU << "\n";	
+	cout << "N tasks=" << n_tasks << "\n";
+	cout << "N CPU=" << CPU_tasks << "\n";*/
 	delete CM; 
 }
 
@@ -1263,6 +1352,9 @@ std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsign
 
 #if (GPU_TEST == false)
 
+
+	//auto kmr_c = NOW;
+
 	kmer2localisation kmer_index;
 	std::unordered_map<kmer, unsigned> merCounts;
 	// std::cerr << "1" << std::endl;
@@ -1279,15 +1371,18 @@ std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsign
 	//~ auto kmer_count(filter_index_kmers(kmer_index,percent_shared));
 	//~ cerr<<"PHASE 2.1 done"<<endl;
 	// std::cerr << "3" << std::endl;
+	
+	//auto anch_c = NOW;
+	
 	auto template_read(get_template(kmer_index,Reads[0],kmer_size));
 	// std::cerr << "ok" << std::endl;
 	//~ cerr<<"PHASE 2 done"<<endl;
-
 	// std::cerr << "4" << std::endl;
+	
 	vector<kmer> anchors(longest_ordered_chain(kmer_index, template_read,edge_solidity));
 	// std::cerr << "ok" << std::endl;
 	//~ cerr<<"PHASE 3 done"<<endl;
-
+	
 	// std::cerr << "5" << std::endl;
 	vector<double> relative_positions=(average_distance_next_anchor(kmer_index,anchors,kmer_count,false));
 	// std::cerr << "ok" << std::endl;
@@ -1323,7 +1418,6 @@ std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsign
 
 #endif	
 
-
 	// std::cerr << "ok" << std::endl;
 	//~ cerr<<"PHASE 5 done"<<endl;
 
@@ -1339,9 +1433,28 @@ std::pair<std::vector<std::vector<std::string>>, std::unordered_map<kmer, unsign
 	// vector<vector<string>> result;
 	// result.push_back(Reads);
 	// std::cerr << "7" << std::endl;
+	//
+
+	//auto cons_c = NOW;
+	
 	result=global_consensus(result,Reads.size(), maxMSA, path);
 	// std::cerr << "ok" << std::endl;
 	//~ cerr<<"PHASE 6 done"<<endl;
+
+	//auto end_c = NOW;
+
+	//t_mtx.lock();
+	//CPU_tasks++;
+	//int64_t tot_cdur = duration_cast<microseconds>(end_c - kmr_c).count();
+	//int64_t kmr_cdur = duration_cast<microseconds>(anch_c - kmr_c).count(); 
+	//int64_t anch_cdur = duration_cast<microseconds>(cons_c - anch_c).count(); 
+	//int64_t cons_cdur = duration_cast<microseconds>(end_c - cons_c).count(); 
+
+	//tot_CPU += (tot_cdur - tot_CPU) / CPU_tasks;
+	//kmr_CPU += (kmr_cdur - kmr_CPU) / CPU_tasks;
+	//anch_CPU += (anch_cdur - anch_CPU) / CPU_tasks;
+	//cons_CPU += (cons_cdur - cons_CPU) / CPU_tasks;
+	//t_mtx.unlock();
 
 	return std::make_pair(result, merCounts);
 }
