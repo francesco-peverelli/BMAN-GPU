@@ -67,7 +67,7 @@ __global__ void compute_d_offsets(int i_seq_idx, int j_seq_idx, int* nseq_offset
 
 //new lpo size kernel 
 template<int SL, int MAXL, int WL>
-__global__ void compute_new_lpo_size(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+__global__ void compute_new_lpo_size(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 //lpo fusion kernel
 template<int SL, int MAXL, int WL>

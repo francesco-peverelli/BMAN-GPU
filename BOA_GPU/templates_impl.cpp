@@ -12,7 +12,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_32, MAX_SEQ_32, WLEN_
 
 template  __global__ void compute_d_offsets<SEQ_LEN_32, MAX_SEQ_32, WLEN_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_32, MAX_SEQ_32, WLEN_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_32, MAX_SEQ_32, WLEN_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_32, MAX_SEQ_32, WLEN_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -41,7 +41,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_64, MAX_SEQ_64, WLEN_
 
 template  __global__ void compute_d_offsets<SEQ_LEN_64, MAX_SEQ_64, WLEN_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_64, MAX_SEQ_64, WLEN_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_64, MAX_SEQ_64, WLEN_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_64, MAX_SEQ_64, WLEN_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -69,7 +69,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_128, MAX_SEQ_128, WLE
 
 template  __global__ void compute_d_offsets<SEQ_LEN_128, MAX_SEQ_128, WLEN_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_128, MAX_SEQ_128, WLEN_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_128, MAX_SEQ_128, WLEN_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_128, MAX_SEQ_128, WLEN_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -99,7 +99,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_255, MAX_SEQ_255, WLE
 
 template  __global__ void compute_d_offsets<SEQ_LEN_255, MAX_SEQ_255, WLEN_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_255, MAX_SEQ_255, WLEN_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_255, MAX_SEQ_255, WLEN_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_255, MAX_SEQ_255, WLEN_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -126,7 +126,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_16_32, MAX_SEQ_16_32,
 
 template  __global__ void compute_d_offsets<SEQ_LEN_16_32, MAX_SEQ_16_32, WLEN_16_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_16_32, MAX_SEQ_16_32, WLEN_16_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_16_32, MAX_SEQ_16_32, WLEN_16_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_16_32, MAX_SEQ_16_32, WLEN_16_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -155,7 +155,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_16_64, MAX_SEQ_16_64,
 
 template  __global__ void compute_d_offsets<SEQ_LEN_16_64, MAX_SEQ_16_64, WLEN_16_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_16_64, MAX_SEQ_16_64, WLEN_16_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_16_64, MAX_SEQ_16_64, WLEN_16_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_16_64, MAX_SEQ_16_64, WLEN_16_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -183,7 +183,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_16_128, MAX_SEQ_16_12
 
 template  __global__ void compute_d_offsets<SEQ_LEN_16_128, MAX_SEQ_16_128, WLEN_16_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_16_128, MAX_SEQ_16_128, WLEN_16_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_16_128, MAX_SEQ_16_128, WLEN_16_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_16_128, MAX_SEQ_16_128, WLEN_16_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -213,7 +213,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_16_255, MAX_SEQ_16_25
 
 template  __global__ void compute_d_offsets<SEQ_LEN_16_255, MAX_SEQ_16_255, WLEN_16_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_16_255, MAX_SEQ_16_255, WLEN_16_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_16_255, MAX_SEQ_16_255, WLEN_16_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_16_255, MAX_SEQ_16_255, WLEN_16_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -240,7 +240,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_32_32, MAX_SEQ_32_32,
 
 template  __global__ void compute_d_offsets<SEQ_LEN_32_32, MAX_SEQ_32_32, WLEN_32_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_32_32, MAX_SEQ_32_32, WLEN_32_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_32_32, MAX_SEQ_32_32, WLEN_32_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_32_32, MAX_SEQ_32_32, WLEN_32_32>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -269,7 +269,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_32_64, MAX_SEQ_32_64,
 
 template  __global__ void compute_d_offsets<SEQ_LEN_32_64, MAX_SEQ_32_64, WLEN_32_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_32_64, MAX_SEQ_32_64, WLEN_32_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_32_64, MAX_SEQ_32_64, WLEN_32_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_32_64, MAX_SEQ_32_64, WLEN_32_64>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -297,7 +297,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_32_128, MAX_SEQ_32_12
 
 template  __global__ void compute_d_offsets<SEQ_LEN_32_128, MAX_SEQ_32_128, WLEN_32_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_32_128, MAX_SEQ_32_128, WLEN_32_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_32_128, MAX_SEQ_32_128, WLEN_32_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_32_128, MAX_SEQ_32_128, WLEN_32_128>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
@@ -327,7 +327,7 @@ template  __device__ void trace_back_lpo_alignment<SEQ_LEN_32_255, MAX_SEQ_32_25
 
 template  __global__ void compute_d_offsets<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 
-template  __global__ void compute_new_lpo_size<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
+template  __global__ void compute_new_lpo_size<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded);
 
 template  __global__ void fuse_lpo<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255>(int i_seq_idx, int j_seq_idx, int* nseq_offsets);
 

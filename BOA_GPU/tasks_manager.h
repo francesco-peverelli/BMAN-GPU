@@ -4,6 +4,8 @@
 #include "poa-gpu-tasks.h"
 #include<condition_variable>
 #include<iostream>
+#include "sys/time.h"
+#include "sys/resource.h"
 
 #define TIMEOUT 2
 
@@ -26,6 +28,7 @@ class SyncMultitaskQueues{
 		TaskType &curr_task;
 		int n_task_types;
 		size_t combined_size;
+		size_t old_s = 0;
 
 	public:
 		SyncMultitaskQueues(std::condition_variable &qf, TaskType& ct, int n_t_types, bool &exec_ntfy, bool &f_mode) : 
@@ -42,6 +45,10 @@ class SyncMultitaskQueues{
 				int n = tasks.size();
 				size_t new_size = combined_size + n;
 				if(new_size > results.size()){
+					//does this work well?
+					if(new_size > old_s + 50000){
+						old_s = new_size;
+					}
 					results.resize(new_size, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>()));
 				}
 				bool notify = false;
@@ -137,21 +144,25 @@ public:
 	poa_gpu_utils::TaskType previous_task = poa_gpu_utils::TaskType::UNDEF;
 	vector<TaskRefs> task_refs;
 
-	std::size_t current_res_index = 0;
 	int num_task_types;
 	bool processing_required = true;
 	bool exec_notified = false;
 	bool flush_mode = false;
+	size_t current_res_index = 0;
 	
+	//batch_size unused ?
 	SyncMultitaskConcurrencyManager(int n_task_types, int batch_size) : num_task_types(n_task_types) {
 		task_refs = vector<TaskRefs>(n_task_types);
-		cout <<  task_refs.size() << " task types!\n";
 		poa_queues = new poa_gpu_utils::SyncMultitaskQueues<T>(
 					queue_rdy_var, current_task, n_task_types, exec_notified, flush_mode
      	             	    	 );
 	}
 	
-	~SyncMultitaskConcurrencyManager(){ delete poa_queues; }	
+	~SyncMultitaskConcurrencyManager(){ 
+		delete poa_queues; 
+		vector<poa_gpu_utils::Task<T>>().swap(results);
+		vector<TaskRefs>().swap(task_refs);
+	}	
 
 	void enqueue_task_vector(vector<Task<T>> &tasks, vector<TaskType> &task_types){
 		poa_queues->enqueue_task_vector(tasks, task_types, results);
@@ -165,17 +176,9 @@ public:
 		return *poa_queues;
 	}
 
-	/*void wait_and_flush_all(){
-		condition_variable all_enqueued;
-		unique_lock<mutex> lck(output_rdy_mutex);
-		while(preprocessing_tasks != 0){
-			cout << "waiting at all enqueued\n";
-			all_enqueued.wait_for(lck, chrono::duration<int>(TIMEOUT), [&]{ return preprocessing_tasks == 0; });
-		}
-		queue_rdy_var.notify_one();
-		output_rdy_var.wait(lck);
-		processing_required = false;
-	}*/
+	int get_combined_size() { return poa_queues->get_combined_size(); }
+
+	size_t get_results_size() { return results.size(); }
 };
 
 template<>
@@ -227,6 +230,49 @@ inline TaskType get_task_type<vector<string>>(Task<vector<string>> &task){
 				max_s = sz;
 			}
 		}
+		if(max_s <= SEQ_LEN_32_32)
+			return TaskType::POA_32_32;
+		else if(max_s <= SEQ_LEN_32_64)
+			return TaskType::POA_32_64;
+		else if(max_s <= SEQ_LEN_32_128)
+			return TaskType::POA_32_128;
+		else if(max_s <= SEQ_LEN_32_255)
+			return TaskType::POA_32_255;
+		else
+			return TaskType::POA_CPU;
+	}else{
+		return TaskType::POA_CPU;
+	}
+}
+
+
+inline TaskType get_task_type_direct(int W, int max_s){
+	
+	if(W <= 8){
+		if(max_s <= SEQ_LEN_32)
+			return TaskType::POA_8_32;
+		else if(max_s <= SEQ_LEN_64)
+			return TaskType::POA_8_64;
+		else if(max_s <= SEQ_LEN_128)
+			return TaskType::POA_8_128;
+		else if(max_s <= SEQ_LEN_255)
+			return TaskType::POA_8_255;
+		else
+			return TaskType::POA_CPU;
+
+	}else if(W <= 16){
+		if(max_s <= SEQ_LEN_16_32)
+			return TaskType::POA_16_32;
+		else if(max_s <= SEQ_LEN_16_64)
+			return TaskType::POA_16_64;
+		else if(max_s <= SEQ_LEN_16_128)
+			return TaskType::POA_16_128;
+		else if(max_s <= SEQ_LEN_16_255)
+			return TaskType::POA_16_255;
+		else
+			return TaskType::POA_CPU;
+
+	}else if(W <= 32){
 		if(max_s <= SEQ_LEN_32_32)
 			return TaskType::POA_32_32;
 		else if(max_s <= SEQ_LEN_32_64)

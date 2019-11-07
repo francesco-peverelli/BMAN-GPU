@@ -67,6 +67,7 @@ struct TaskRefs{
 	char* sequences;
 	vector<int> seq_offsets;
 
+	int* space_exceeded;
 	char* result;//[WL * MAXL * BDIM];
 	int* res_size;//[BDIM];
 	

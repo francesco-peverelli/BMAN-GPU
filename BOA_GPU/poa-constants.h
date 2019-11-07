@@ -26,8 +26,8 @@
 
 #define WLEN_255 8
 #define SEQ_LEN_255 255
-#define MAX_SEQ_255 672
-#define BLOCK_DIM_255 10000//10910
+#define MAX_SEQ_255 830
+#define BLOCK_DIM_255 5000//10910
 
 #define WLEN_16_32 16
 #define SEQ_LEN_16_32 31
@@ -51,8 +51,8 @@
 
 #define WLEN_32_32 32
 #define SEQ_LEN_32_32 31
-#define MAX_SEQ_32_32 160
-#define BLOCK_DIM_32_32 150000
+#define MAX_SEQ_32_32 352//256
+#define BLOCK_DIM_32_32 50000//80000
 
 #define WLEN_32_64 32
 #define SEQ_LEN_32_64 63

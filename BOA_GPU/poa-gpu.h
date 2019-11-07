@@ -13,6 +13,8 @@
 #include "cuda-poa.cuh"
 #include "tasks_manager.h"
 
+#define DEBUG 1
+
 using namespace std;
 using namespace chrono;
 
@@ -98,6 +100,8 @@ template<int SL, int MAXL, int WL, int BDIM>                                    
 	T.result = (char*)malloc(WL * MAXL * BDIM);
 	T.res_size = (int*)malloc(BDIM * sizeof(int));
 
+	cudaErrchk(cudaMalloc(&T.space_exceeded, sizeof(int)));
+
 	cudaErrchk(cudaMalloc(&T.old_len_global_d, (unsigned long long)BDIM * sizeof(int)));
 	cudaErrchk(cudaMalloc(&T.dyn_len_global_d, (unsigned long long)BDIM * sizeof(int)));
 
@@ -151,10 +155,12 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 	int input_size = input.size();
 	int N_BL = (input_size - 1) / BDIM + 1;
 	int LAST_BATCH_SIZE = (input_size - 1) % BDIM + 1;
-	
-	vector<vector<string>> result_data(input_size);
+	int *space_exceeded = (int*)malloc(sizeof(int));
 
-	//cout << "Executing POA: BDIM = " << BDIM << ", BATCHES = " << N_BL << " SL=" << SL << "MAXL=" << MAXL << "WL=" << WL << endl;
+	vector<vector<string>> result_data(input_size);
+#if DEBUG
+	cerr << "Executing POA: BDIM = " << BDIM << ", BATCHES = " << N_BL << " SL=" << SL << "MAXL=" << MAXL << "WL=" << WL << endl;
+#endif	
 	/*cout << "--- input dump, size=" << input.size() << "\n";
 	for(auto W : input){
 		auto v = W.task_data;
@@ -191,6 +197,7 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 		//cout << "Start memcpy\n";
 		//cout << "Memcpy of " << T.seq_offsets[T.tot_nseq-1] << " bytes\n";
 		
+		cudaErrchk(cudaMemcpy(T.space_exceeded, space_exceeded, sizeof(int), cudaMemcpyHostToDevice));
 		cudaErrchk(cudaMemcpy(T.sequences_d, T.sequences, T.seq_offsets[T.tot_nseq-1], cudaMemcpyHostToDevice));
 		cudaErrchk(cudaMemcpy(T.seq_offsets_d, T.seq_offsets.data(), T.tot_nseq * sizeof(int), cudaMemcpyHostToDevice));
 		cudaErrchk(cudaMemcpy(T.nseq_offsets_d, T.nseq_offsets.data(), (unsigned long long)BLOCKS * sizeof(int), cudaMemcpyHostToDevice));
@@ -226,7 +233,7 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 			
 			cudaStreamSynchronize(0); 
 
-			compute_new_lpo_size<SL, MAXL, WL><<<BLOCKS, 1>>>(i_seq_idx, j_seq_idx, T.nseq_offsets_d);
+			compute_new_lpo_size<SL, MAXL, WL><<<BLOCKS, 1>>>(i_seq_idx, j_seq_idx, T.nseq_offsets_d, T.space_exceeded);
 			
 			cudaStreamSynchronize(0); 
 			
@@ -242,6 +249,20 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 		}
 		
 		//cout << "Copy result sizes\n";
+		cudaErrchk(cudaMemcpy(space_exceeded, T.space_exceeded, sizeof(int), cudaMemcpyDeviceToHost));
+		//cerr << "Space exceeded flag = " << space_exceeded << endl;
+
+		if(*space_exceeded == 1){
+			cerr << "Entered recovery mode\n";
+			result_GPU[input[block_offset].task_id].task_id = -2;
+			result_GPU[input[block_offset].task_id].task_data = input[block_offset].task_data;
+			auto i_it_end = input.begin() + block_offset + BLOCKS;
+			for(auto it = input.begin() + block_offset+1; it != i_it_end; it++){
+				result_GPU[it->task_id].task_id = -2;
+				result_GPU[it->task_id].task_data = it->task_data;
+			}
+			break;
+		}
 
 		copy_result_sizes<SL, MAXL, WL><<<BLOCKS, 1>>>(T.nseq_offsets_d, T.res_size_d);
 		
@@ -282,6 +303,13 @@ void gpu_POA(vector<Task<vector<string>>> &input, TaskRefs &T, vector<Task<vecto
 			result_GPU[it->task_id].task_id = it->task_id;
 			result_GPU[it->task_id].task_index = it->task_index;
 			result_GPU[it->task_id].task_data = form_window<MAXL>(res_offs, nseq_b, res_size_b/nseq_b);
+#if DEBUG
+			//DEBUG CODE
+			if(it->task_data.size() > result_GPU[it->task_id].task_data.size()){
+				cerr << "[KERNEL_ERROR]: I/O size mismatch: " << it->task_data.size() << ", " 
+					<< result_GPU[it->task_id].task_data.size() << "\n";
+			}
+#endif
 			i++;
 		}	
 

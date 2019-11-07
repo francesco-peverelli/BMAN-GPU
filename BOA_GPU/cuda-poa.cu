@@ -36,6 +36,7 @@ __device__ short* diagonals_gy_global;
 __device__ int* d_offsets_global;
 __device__ int* x_to_ys;
 __device__ int* y_to_xs;
+__device__ int g_space_exceeded = 0;
 
 __inline__ __device__ MaxCell wrapReduceMax(MaxCell cell){
 	
@@ -177,6 +178,8 @@ template<int SL, int MAXL, int WL>
 template<int SL, int MAXL, int WL>
  __global__ void init_diagonals(int i_seq_idx, int j_seq_idx, int max_gapl, int uses_global, int* nseq_offsets){
 	
+	if(g_space_exceeded) return;
+
 	int nseq;
 	int block_offset;
 	int myId = blockIdx.x;
@@ -276,6 +279,8 @@ template<int SL, int MAXL, int WL>
 template<int SL, int MAXL, int WL>
  __global__ void sw_align(int i_seq_idx, int j_seq_idx, int max_gapl, int uses_global, int* nseq_offsets) {
 	
+	if(g_space_exceeded) return;
+
 	int myId = blockIdx.x;
 	__shared__ int nseq;
 	__shared__ int block_offset;
@@ -549,6 +554,8 @@ __device__ void debug_print_lpo(int len, unsigned char* seq, Edge* edge, int* st
 template<int SL, int MAXL, int WL>
 __global__ void fuse_lpo(int i_seq_idx, int j_seq_idx, int* nseq_offsets) {
 	
+	if(g_space_exceeded) return;
+
 	int nseq;
 	int block_offset;
 	int myId = blockIdx.x;
@@ -908,6 +915,8 @@ __global__ void compute_result(int *nseq_offsets, char* result, int* seq_offsets
 template<int SL, int MAXL, int WL>
 __global__ void compute_d_offsets(int i_seq_idx, int j_seq_idx, int* nseq_offsets) {
 	
+	if(g_space_exceeded) return;
+
 	int nseq;
 	int block_offset;
 	int myId = blockIdx.x;
@@ -941,7 +950,9 @@ __global__ void compute_d_offsets(int i_seq_idx, int j_seq_idx, int* nseq_offset
 }
 
 template<int SL, int MAXL, int WL>
-__global__ void compute_new_lpo_size(int i_seq_idx, int j_seq_idx, int* nseq_offsets) {
+__global__ void compute_new_lpo_size(int i_seq_idx, int j_seq_idx, int* nseq_offsets, int* space_exceeded) {
+
+	if(g_space_exceeded) return;
 
 	int nseq;
 	int block_offset;
@@ -971,13 +982,17 @@ __global__ void compute_new_lpo_size(int i_seq_idx, int j_seq_idx, int* nseq_off
 		old_len_global[myId] = dyn_len_global[myId];
 		dyn_len_global[myId] = len_x + count_unmapped;
 		if(len_x + count_unmapped >= MAXL){
-			printf("ERROR: length %d exceeded maximmum limit\n", len_x + count_unmapped);
+			printf("ERROR: length %d exceeded maximmum limit(%d)\n", len_x + count_unmapped, MAXL);
+			*space_exceeded = 1;
+			g_space_exceeded = 1;
 		}
 	}
 }
 
 template<int SL, int MAXL, int WL>
 __global__ void copy_new_lpo_data(int j_seq_idx, int* nseq_offsets) {
+	
+	if(g_space_exceeded) return;
 
 	int myTId = threadIdx.x;	
 	int nseq;

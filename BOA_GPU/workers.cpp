@@ -70,7 +70,7 @@ void sel_gpu_POA_alloc(TaskRefs &TR, TaskType& TTy){
 			gpu_POA_alloc<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255, BLOCK_DIM_32_255>(TR);
 			break;
 		default:
-			cout << "Unsupported task type!\n";
+			cerr << "Unsupported task type!\n";
 			break;
 	}
 }
@@ -118,7 +118,7 @@ void sel_gpu_POA(vector<Task<vector<string>>> &input_tasks, TaskRefs &TR, vector
                         gpu_POA<SEQ_LEN_32_255, MAX_SEQ_32_255, WLEN_32_255, BLOCK_DIM_32_255>(input_tasks, TR, total_res_GPU, res_write_idx);
 			break;
 		default:
-			cout << "Unsupported task type!\n";
+			cerr << "Unsupported task type!\n";
 			break;
 	}
 }
@@ -129,8 +129,6 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 				 bool &processing_required, TaskType &current_task, TaskType &prev_task, vector<Task<vector<string>>> &result,
 				 int num_task_types, size_t &res_write_idx){
 	
-
-	cout << "[EXEC_THREAD]: exec thread activated\n";
 
 	unique_lock<mutex> lock(q_full_mutex);
 
@@ -145,12 +143,11 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 
 
 		if(!flush_mode){
-
-			cout << "[EXEC_THREAD]: normal mode exec...\n";
+			
+			cerr << "Normal execution" << endl;
 
 			if(current_task == TaskType::POA_CPU){
 				//call CPU thread worker(s)
-				cout << "CPU offload not supported!!!\n";
 				exit(-1);
 			} 		
 
@@ -164,12 +161,15 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 
 			//do execution
 			vector<Task<vector<string>>> input_tasks;
+			cerr << "Retrieving data.." << endl;
 			t_queues.retrieve_data_batch(input_tasks, current_task);
 			
-			cout << "Executing batch of " << input_tasks.size() << "\n";
+			cerr << "Exec poa" << endl;
 
 			sel_gpu_POA(input_tasks, task_refs[(int)current_task], result, res_write_idx, current_task);
 			
+			cerr << "Exec done " << endl;
+
 			prev_task = current_task;
 			res_write_idx += input_tasks.size();
 			//cout << "T time = " << duration_T.count() << " microseconds" << endl;
@@ -177,7 +177,7 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 			
 		}else{
 
-			cout << "[EXEC_THREAD]: flushing mode...\n";
+			//cerr << "Flush" << endl;
 
 			if(prev_task != TaskType::UNDEF){
 				gpu_POA_free(task_refs[prev_task], prev_task);
@@ -196,7 +196,6 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 					vector<Task<vector<string>>> input_tasks;
 					t_queues.retrieve_data_batch(input_tasks, t_type);
 
-					cout << "Executing batch of " << input_tasks.size() << "\n";		
 
 					sel_gpu_POA(input_tasks, task_refs[TTy], result, res_write_idx, t_type);
 					res_write_idx += input_tasks.size();
@@ -205,17 +204,18 @@ void execute_poa(SyncMultitaskQueues<vector<string>> &t_queues, vector<TaskRefs>
 					
 				}
 			}
-			cout << "[EXEC_THREAD]:DEVICE RESET\n";
 			cudaDeviceReset();
 			
 			t_queues.reset_combined_size();
 			res_write_idx = 0;
 			out_rdy_var.notify_all();
+
 			
 		}//flush queue code end
 		
 		is_notified = false;
 	} //processing_required loop end
+
 
 }
 
