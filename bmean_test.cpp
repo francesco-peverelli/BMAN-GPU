@@ -1,9 +1,14 @@
 #include "bmean_test.h"
+#include "poa-gpu.h"
+#include "tasks_manager.h"
 #include <iostream>
 #include <fstream>
 #include <map>
 
+using namespace std::chrono;
+
 #define DEBUG 0
+#define NOW high_resolution_clock::now()
 
 constexpr int MAX_L = 8;
 constexpr int MIN_L = 2;
@@ -18,9 +23,18 @@ const string SC_PATH = "./BOA/blosum80.mat";
 const string ERR_FILE_PATH = "./error_file_archive.txt";
 const string W_START = "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<";
 const string W_END   = ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
-
+//constexpr int N_THREADS = 64;
 
 static map<int,char> char_map = { { 0, 'A' }, { 1, 'C' }, { 2, 'G' }, { 3, 'T' } };
+
+vector<string> test_bmean(vector<string> &W, int maxMSA, string path) {
+
+	//sw POA lib call
+	vector<string> result_POA = consensus_POA( W, maxMSA, path );
+
+	return result_POA;
+
+}
 
 vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int batch_size){
 	
@@ -32,7 +46,7 @@ vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int ba
 	bool printed = false;
 	unsigned long long lineno = 0;
 
-	for(int i = 0; i < 5; i++){
+	for(int i = 0; i < 50; i++){
 	
 	ifstream file(filepath);
 
@@ -87,14 +101,106 @@ vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int ba
 	return batch;
 }
 
-vector<string> test_bmean(vector<string> &W, int maxMSA, string path) {
+void read_batch_2(vector<vector<string>> &batch, size_t size, string filename){
 
-	//sw POA lib call
-	//vector<string> result_POA = consensus_POA( W, maxMSA, path );
+    std::ifstream infile(filename);
+    std::string line;
+    int n = 0;
+    int i = 0;
+    while (getline(infile, line))
+    {
+        if (n == 0)
+        {
+            n = stoi(line);
+            batch.emplace_back(std::vector<std::string>());
+        }
+        else
+        {
+            batch.back().push_back(line);
+            n--;
+        }
+	i++;
+    }
 
-	//return result_POA;
-	cout << "ERROR:: This is not a function!!!!!\n";
-	return vector<string>();
+}
+
+void execute_bmean(vector<vector<string>> batch, vector<vector<string>> &batch_result){
+	
+	int size = batch.size();	
+	for(int i = 0; i < size; i++){
+		batch_result[i] = test_bmean(batch[i], MAX_MSA, SC_PATH);
+	}
+}
+
+void get_bmean_batch_result_mt(vector<vector<string>> &windows, vector<vector<string>> &results, unsigned int n_threads) {	
+	
+	cout << "n threads: " << n_threads << endl;
+	int size = windows.size();
+	int batch_size = size/n_threads;
+	thread threads[n_threads];
+	vector<vector<vector<string>>> batches(n_threads);
+	vector<vector<vector<string>>> batch_results(n_threads);	
+
+	for(int i = 0; i < n_threads; i++){
+		//cout << "thread " << i << ", batch_size=" << batch_size << "\n";
+		batches[i] = vector<vector<string>>(batch_size);
+		batch_results[i] = vector<vector<string>>(batch_size);
+		for(int j = 0; j < batch_size; j++){
+			if(i * batch_size + j < windows.size()){
+				//cout << "b[" << i << "][" << j << "] --> windows[" << i * batch_size + j << "]\n";
+				batches[i][j] = windows[i * batch_size + j];
+			}
+		}
+		//cout << "t[" << i << "exec\n";
+		threads[i] = thread(execute_bmean, batches[i], ref(batch_results[i]));
+	}
+
+	for(int i = 0; i < n_threads; i++){
+		threads[i].join();
+	}
+
+	for(int i = 0; i <  size; i++){
+		//if((i%N_THREADS) * batch_size + i/N_THREADS < size){
+		 	//cout << "res[" << i << "] <-- b_res[" << i/batch_size << "][" << i%batch_size << "]\n";
+			results[i] = batch_results[i/batch_size][i%batch_size];
+		//}
+	}
+	//exit(0);
+}
+
+
+void get_bmean_batch_result_gpu(vector<vector<string>> windows, vector<vector<string>> &results, int &c, int max_s, int max_w){
+
+	poa_gpu_utils::TaskRefs T;
+	poa_gpu_utils::TaskType TTy;
+	size_t size = windows.size();
+
+	vector<vector<string>> result_GPU;
+	vector<poa_gpu_utils::Task<vector<string>>> gpu_tasks(size, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>()));
+	vector<poa_gpu_utils::Task<vector<string>>> gpu_res(size, poa_gpu_utils::Task<vector<string>>(0,0,vector<string>()));
+	
+	//task transfer
+	int i = 0;
+	for(auto s : windows){
+		poa_gpu_utils::Task<vector<string>> t = poa_gpu_utils::Task<vector<string>>(i, i, s);
+		gpu_tasks[i] = t;
+		i++;
+	}
+
+	TTy = poa_gpu_utils::get_task_type_direct(max_w, max_s);
+
+	auto start = NOW;
+
+	poa_gpu_utils::sel_gpu_POA_alloc(T, TTy);
+	poa_gpu_utils::sel_gpu_POA(gpu_tasks, T, gpu_res, 0, TTy);
+	poa_gpu_utils::gpu_POA_free(T,TTy);
+
+	auto end = NOW;
+	c = duration_cast<microseconds>(end - start).count();
+
+	for(auto r : gpu_res){
+		results.push_back(r.task_data);
+	}
 }
 
 vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC(vector<vector<string>> &test_in){

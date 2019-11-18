@@ -1,13 +1,17 @@
 #ifndef BMEAN_TEST_H
 #define BMEAN_TEST_H
 
+#include "utils.h"
+#include "bmean.h"
 #include <unordered_map>
 #include <vector>
 #include <random>
-#include "bmean.h"
 #include "global_tasks_manager.h"
 
+
 using namespace std;
+
+void read_batch_2(vector<vector<string>> &batch, size_t size, string filename);
 
 vector<vector<string>> read_batch(string &filepath, int max_N, int max_W, int batch_size);
 
@@ -27,6 +31,10 @@ vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC
 vector<pair<vector<vector<string>>, unordered_map<kmer, unsigned>>> testMSABMAAC_gpu_std(vector<vector<string>> &test_in);
 
 vector<string> generate_random_window(int max_L, int min_L, int max_N);
+
+void get_bmean_batch_result_mt(vector<vector<string>> &windows, vector<vector<string>> &results, unsigned int n_threads);
+
+void get_bmean_batch_result_gpu(vector<vector<string>> windows, vector<vector<string>> &results, int &c, int max_s, int max_w);
 
 void test_batch(vector<vector<string>> &obtained, vector<vector<string>> &expected);
 

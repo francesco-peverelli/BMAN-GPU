@@ -8,34 +8,17 @@
 #include <stdexcept>
 #include <condition_variable>
 #include "bmean_test.h"
+#include "input_utils.h"
 
-#define TEST 1
+#define TEST 0
 
 using namespace std;
 using namespace chrono;
+using namespace in_utils;
 
 #define NOW high_resolution_clock::now() 
 
 //poa_gpu_utils::TaskConcurrencyManager CM(NUM_TASK_TYPES, BATCH_SIZE);
-
-int check_input_int(string &arg){
-	
-	try{
-		size_t pos;
-		int arg_i = stoi(arg, &pos);
-		if(pos < arg.size()){
-			std::cerr << "Trailing characters after number: " << arg << '\n';
-		}
-		return arg_i;
-	} catch (invalid_argument const &ex) {
-		std::cerr << "Invalid number: " << arg << '\n';
-		return -1;
-	} catch (out_of_range const &ex) {
-		std::cerr << "Number out of range: " << arg << '\n';
-		return -1;
-	}
-	
-}
 
 int main(int argc, char* argv[]) {
 

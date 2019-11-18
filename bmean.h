@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include "utils.h"
 #include "workers.h"
 #include <cmath>
@@ -40,11 +41,21 @@ void MSABMAAC_gpu_init_batch(size_t batch_size, thread &exec_t);
 
 void MSABMAAC_gpu_init(size_t batch_size);
 
+size_t MSABMAAC_gpu_get_manager_tasks();
+
 void MSABMAAC_gpu_done();
+
+void MSABMAAC_exit();
+
+vector<poa_gpu_utils::Task<vector<string>>> MSABMAAC_get_gpu_results();
+
+vector<poa_gpu_utils::Task<vector<string>>> easy_enqueue(const  vector<vector<string>>& V, uint32_t n, unsigned maxMSA, string path);
 
 vector<vector<string>> MSABMAAC_gpu_dequeue(vector<poa_gpu_utils::Task<vector<string>>> &task_vector, unsigned maxMSA, string path); 
 
 vector<vector<string>> MSABMAAC_gpu_dequeue_ctpl(int id, vector<poa_gpu_utils::Task<vector<string>>> &task_vector, unsigned maxMSA, string path);      
 bool needs_poa(const vector<string>& V);
+
+vector<string> consensus_POA( vector<string>& W, unsigned maxMSA, string path);
 
 #endif

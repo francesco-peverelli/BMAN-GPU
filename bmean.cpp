@@ -28,33 +28,16 @@ extern "C"{
 #include "seq_util.h"
 }
 
-#define GPU_TEST 0
-#define TOUT(str) cout << "[PREP_THREAD " << tid << "]:" << str << "\n";
+#define GPU_TEST 1
+#define TOUT(str) cerr << "[PREP_THREAD " << tid << "]:" << str << "\n";
 
 using namespace std;
 
 poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>  *CM;
 
 mutex p_mtx;
-int offlw = 0;
-int trivw = 0;
-int gpuw = 0;
-int longw = 0;
-long maxw = 0;
-
 mutex t_mtx;
-int64_t anch_avg = 0;
-int64_t kmr_avg = 0;
-int64_t cons_avg = 0;
-int64_t tot_avg = 0;
-int64_t n_tasks = 0;
-
-int64_t anch_CPU = 0;
-int64_t kmr_CPU = 0;
-int64_t cons_CPU = 0;
-int64_t tot_CPU = 0;
-int64_t CPU_tasks = 0;
-
+int e = 0;
 
 void safe_print(const char* s, int tid){
 	p_mtx.lock();
@@ -64,12 +47,12 @@ void safe_print(const char* s, int tid){
 
 void execute_gpu_poa(int id, poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> *CM){
 	
-	poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
+	//poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
 	//poa_gpu_utils::SyncMultitaskQueues<vector<string>> &queues = *(cm.poa_queues);
 	
-	execute_poa(cm.get_queues_ref(), cm.task_refs, cm.queue_rdy_mutex, cm.output_rdy_mutex, cm.queue_rdy_var, cm.output_rdy_var, 
-		    cm.exec_notified, cm.flush_mode, cm.processing_required, cm.current_task, cm.previous_task, cm.results,
-		    cm.num_task_types, cm.current_res_index);
+	execute_poa(CM->get_queues_ref(), CM->task_refs, CM->queue_rdy_mutex, CM->output_rdy_mutex, CM->queue_rdy_var, CM->output_rdy_var, 
+		    CM->exec_notified, CM->flush_mode, CM->processing_required, CM->current_task, CM->previous_task, CM->results,
+		    CM->num_task_types, CM->current_res_index);
 }
 
 void MSABMAAC_gpu_init_ctpl(size_t batch_size, ctpl::thread_pool &my_pool){
@@ -84,6 +67,12 @@ void MSABMAAC_gpu_init_batch(size_t batch_size, std::thread &exec_t){
 
 void MSABMAAC_gpu_init(size_t batch_size){
 	CM = new poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>>(NUM_TASK_TYPES, batch_size);
+}
+
+size_t MSABMAAC_gpu_get_manager_tasks() { return CM->get_results_size(); }
+
+vector<poa_gpu_utils::Task<vector<string>>> MSABMAAC_get_gpu_results(){
+	return CM->results;
 }
 
 struct localisation {
@@ -1016,7 +1005,7 @@ vector<string> get_easy_consensus(vector<string> V){
 	
 	string result ="";	
 	if(V.size() == 0){
-		cout << "Empty v\n";
+		e++;
 		return {result};
 	}
 
@@ -1135,8 +1124,6 @@ vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, co
 		}
 	}
 
-	//TOUT("determined task types vector...");
-
 	CM->enqueue_task_vector(task_to_process, t_types);
 
 	int i = 0;
@@ -1150,6 +1137,12 @@ vector<poa_gpu_utils::Task<vector<string>>> global_consensus_enqueue(int tid, co
 	return task_vector;
 }
 
+vector<poa_gpu_utils::Task<vector<string>>> easy_enqueue(const  vector<vector<string>>& V, uint32_t n, unsigned maxMSA, string path){
+
+	return global_consensus_enqueue(0, V, n, maxMSA, path);
+
+}
+
 vector<vector<string>> global_consensus_dequeue(vector<poa_gpu_utils::Task<vector<string>>> &task_vector, unsigned maxMSA, string path){
 
 	//cout << "[POSTP_THREAD]: tasks dequeued...\n";
@@ -1158,7 +1151,7 @@ vector<vector<string>> global_consensus_dequeue(vector<poa_gpu_utils::Task<vecto
 
 	string stacked_consensus = "";
 	vector<vector<string>> result;
-	poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
+	//poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
 
 	//unique_lock<mutex> lock(cm.output_rdy_mutex);
 	//cm.output_rdy_var.wait(lock);
@@ -1172,17 +1165,17 @@ vector<vector<string>> global_consensus_dequeue(vector<poa_gpu_utils::Task<vecto
 			}else{
 				stacked_consensus += T.task_data[0];
 			}
-			trivw++;	
 		}else if(T.task_id == -2){
 			//CPU offload of the task
 			//cout << "[POSTP_THREAD]: offload...\n"; 
 			stacked_consensus += easy_consensus(T.task_data, maxMSA, path)[0];
-			offlw++;
 		}else{
 			//cout << "[POSTP_THREAD]: ge cons...\n";  
 			//if((T.task_id >= cm.results.size() || T.task_id < 0)){ cout << "out\n"; exit(-1);}
-			stacked_consensus += get_easy_consensus(cm.results[T.task_id].task_data)[0];
-			gpuw++;
+			//if(CM->results[T.task_id].task_data.size() == 0){
+				//cerr << empty, res_size = " << CM->get_combined_size() << endl;
+			//}
+			stacked_consensus += get_easy_consensus(CM->results[T.task_id].task_data)[0];
 		}
 	}
 	//cout << "RES>>>> " << stacked_consensus << "\n";
@@ -1301,17 +1294,18 @@ void MSABMAAC_gpu_flush(){
 
 	//cout << "[FLUSH]: waiting for output...\n";
 	
-	unique_lock<mutex> lock(cm.output_rdy_mutex);
+	unique_lock<mutex> lock(CM->output_rdy_mutex);
 
-	while(cm.exec_notified){
-		cm.output_rdy_var.wait_for(lock, chrono::duration<int>(TIMEOUT), [&]{ return cm.exec_notified == 0; });
+	while(CM->exec_notified){
+		CM->output_rdy_var.wait_for(lock, chrono::duration<int>(TIMEOUT), [&]{ return CM->exec_notified == 0; });
 	}
 }
 
 void MSABMAAC_gpu_done(){ 
-	poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
-	cm.processing_required = false;
-	cm.queue_rdy_var.notify_all();
+	//poa_gpu_utils::SyncMultitaskConcurrencyManager<vector<string>> &cm = *CM;
+	CM->processing_required = false;
+	CM->queue_rdy_var.notify_all();
+	cerr << "Empty=" << e << endl;
 	/*cout << "Tot=" << tot_avg << "\n";
         cout << "Kmer=" << kmr_avg << "\n";
 	cout << "Anch=" << anch_avg << "\n";
@@ -1322,7 +1316,11 @@ void MSABMAAC_gpu_done(){
 	cout << "Cons_CPU=" << cons_CPU << "\n";	
 	cout << "N tasks=" << n_tasks << "\n";
 	cout << "N CPU=" << CPU_tasks << "\n";*/
-	delete CM; 
+	//delete CM; 
+}
+
+void MSABMAAC_exit(){
+	delete CM;
 }
 
 

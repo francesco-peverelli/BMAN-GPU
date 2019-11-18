@@ -33,7 +33,16 @@ all: $(EXEC)
 #testLR:  testLR.o bmean.o utils.o
 #	$(CXX_GPU) $(NVCC_W) $(LFLAGS)  $(OBJS) -o $@
 
-testGPU: bmean.o utils.o bmean_test.o gpu_poa_test.o 
+lpo_test: bmean.o utils.o bmean_test.o input_utils.o lpo_test.o
+ifneq (,$(wildcard ./gpu_poa_test.o))
+	    rm gpu_poa_test.o
+endif
+	$(CXX_GPU) $(NVCC_LFLAGS)  $(NVCC_W) $(LFLAGS)  $(OBJS) -o $@
+
+testGPU: bmean.o utils.o bmean_test.o input_utils.o gpu_poa_test.o 
+ifneq (,$(wildcard ./lpo_test.o))
+	    rm lpo_test.o
+endif
 	$(CXX_GPU) $(NVCC_LFLAGS)  $(NVCC_W) $(LFLAGS)  $(OBJS) -o $@ 
 
 %.o: %.cpp
@@ -42,6 +51,13 @@ testGPU: bmean.o utils.o bmean_test.o gpu_poa_test.o
 
 clean:
 	rm -rf *.o
+ifneq (,$(wildcard ./testGPU))
 	rm testGPU
+endif
+ifneq (,$(wildcard ./lpo_test))
+	rm lpo_test
+endif
+
+
 
 rebuild: clean $(EXEC)
